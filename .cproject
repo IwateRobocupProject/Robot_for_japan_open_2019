@@ -585,7 +585,7 @@
 							</tool>
 							<tool id="fr.ac6.managedbuild.tool.gnu.cross.cpp.linker.708742038" name="MCU G++ Linker" superClass="fr.ac6.managedbuild.tool.gnu.cross.cpp.linker">
 								<option id="fr.ac6.managedbuild.tool.gnu.cross.cpp.linker.script.268458482" name="Linker Script (-T)" superClass="fr.ac6.managedbuild.tool.gnu.cross.cpp.linker.script" value="${ProjDirPath}/Release/linker-script-release.ld" valueType="string"/>
-								<option id="gnu.cpp.link.option.flags.703145934" name="Linker flags" superClass="gnu.cpp.link.option.flags" value="-Wl,--wrap=main -Wl,--wrap=_malloc_r -Wl,--wrap=_free_r -Wl,--wrap=_realloc_r -Wl,--wrap=_memalign_r -Wl,--wrap=_calloc_r -Wl,--wrap=exit -Wl,--wrap=atexit -DNDEBUG -Wl,-n -Wl,--start-group -lstdc++ -lsupc++ -lm -lc -lgcc -lnosys -Wl,--end-group" valueType="string"/>
+								<option id="gnu.cpp.link.option.flags.703145934" name="Linker flags" superClass="gnu.cpp.link.option.flags" useByScannerDiscovery="false" value="-Wl,--wrap=main -Wl,--wrap=_memalign_r -Wl,--wrap=exit -Wl,--wrap=atexit -DNDEBUG -Wl,-n -Wl,--start-group -lstdc++ -lsupc++ -lm -lc -lgcc -lnosys -Wl,--end-group" valueType="string"/>
 								<option id="gnu.cpp.link.option.userobjs.645023451" name="Other objects" superClass="gnu.cpp.link.option.userobjs" valueType="userObjs">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/mbed/TARGET_NUCLEO_F446RE/TOOLCHAIN_GCC_ARM/PeripheralPins.o}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/mbed/TARGET_NUCLEO_F446RE/TOOLCHAIN_GCC_ARM/analogin_api.o}&quot;"/>

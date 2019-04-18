@@ -6,7 +6,7 @@
 //const 
 const float PI = 3.1415926;
 const int R = 127;
-const float tp = 0.4, ti = 0.05, td = 2.5;
+const double tp = 0.4, ti = 0.05, td = 2.5;
 
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
