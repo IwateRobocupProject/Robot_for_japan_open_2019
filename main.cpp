@@ -3,10 +3,47 @@
 #include "Ping.h"
 #include "Motor.h"
 
-//const 
-const float PI = 3.1415926;
-const int R = 127;
-const double tp = 0.4, ti = 0.05, td = 2.5;
+//constant
+#define GK	1
+#define	FW	0
+#define PI	3.1415926
+
+/*調整するときに読んでね*/
+/*ロボットを調整する項目は3つあります
+ * 以下の調整は試合前に必ずに行ってください
+ *
+ * 一つ目はラインセンサの調整です
+ *　ロボットを起動し、USBケーブルを挿しこんだ後
+ *　ロボットを起動し、USBケーブルを挿しこんだ後ターミナルを起動して'd'を押してください
+ *　各種センサ値が表示されます
+ *　コートの緑のマット上でLine_front ~ Line_rightの数値が
+ *　75前後　になるように、
+ *　ロボットの底面についている可変抵抗(青いやつ)を小さいドライバーで回して調整してください
+ *　可変抵抗を時計回りに回すと数値が上がります
+ *　キーボード'r'でセンサの値の取得を一時停止することができます
+ *
+ *　２つ目は回り込み半径の調整です
+ * Rを調整することでボールに対してどれくらいの半径を描いて回り込むか調整することができます
+ * 上記と同様にターミナルソフトを起動してキーボード'd'を押すと
+ * 現在のセンサの数値を見ることができますのでBall distance:
+ * の数値を参考にして最適なRを決定してください(distanceの数値=Rにする)
+ * キーボード'r'でセンサの値の取得を一時停止することができます
+ *
+ * ３つ目はスピードとPIDゲイン値の調整です
+ * まずラインから出ないようにspeedを調整します
+ * そのあとロボットが常に前に向くように(傾いても元の方向にすぐに戻るように)
+ * tp ti tdを調整してください
+ * P→D→I(またはP→I→D)の順番に調整すると良いかもしれません
+ *
+ *　以上のことが完了してからプログラムの作成を開始してください
+ */
+
+//パラメータ調整項目
+const int R = 127;//ロボット回り込み半径(0~255)
+const int speed = 80;//(0~100)の間で調整
+const double tp = 0.4;//比例ゲイン
+const double ti = 0.05;//積分ゲイン
+const double td = 2.5;//微分ゲイン
 
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
@@ -15,6 +52,7 @@ Serial pc(SERIAL_TX, SERIAL_RX);
 Ping uss_left(PA_6);
 Ping uss_right(PA_7);
 Ping uss_back(PB_6);
+Ticker timer_USS;//割り込み用
 
 //BallSensor&Linesensor
 AnalogIn ball_degree(PA_4);
@@ -46,14 +84,32 @@ DigitalIn sw_reset(PC_12); //gyro sensor reset switch
 //variable
 char line_value;
 int degree_value, distance_value;
+int uss_left_range = 0,uss_right_range = 0,uss_back_range = 0;
 
 //declear prototype (function list)
-int PID(double kp, double ki, double kd, int target, int degree, int reset = 0);
-void sensor_read();
-int get_ball_degree(int A = 0);
-int get_ball_distance(int A = 0);
-int get_line_degree();
-int turn(int degree, int distance);
+void sensor_read();//シリアル割り込みで使う関数
+void uss_send_and_read();//超音波センサ読み込み
+int PID(double kp, double ki, double kd, int target, int degree, int reset = 0);//姿勢制御のPIDで計算する
+int get_ball_degree(int A = 0);//ボールの角度を-180~180(ボールなし999)で取得する
+int get_ball_distance(int A = 0);//ボールの距離を0~255で取得する
+int get_line_degree();//反応したラインの方向(角度)を0~315(反応なし999)で取得する
+int turn(int degree, int distance);//回り込みの進行方向を計算する
+int get_uss_range(char c);//超音波センサの距離を取得する　引数('l','r','b')を代入するとその方向の値が得られる
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*****************************************************************/
 /**********************main function******************************/
@@ -73,23 +129,34 @@ int main() {
 	uss_right.Set_Speed_of_Sound(32); //(cm/ms)
 	uss_left.Set_Speed_of_Sound(32); //(cm/ms)
 	uss_back.Set_Speed_of_Sound(32); //(cm/ms)
+	timer_USS.attach(&uss_send_and_read,0.04);//0.04秒ごとに超音波を発信する
 
 	/*motor pwm frequency set*/
 	motor.setPwmPeriod(0.00052);
 
 	/*change Mode IMU,COMPASS,M4G,NDOF_FMC_OFF,NDOF*/
+	/*BNO055モードについて
+	 * ジャイロセンサーには様々なモードがありますが
+	 * 基本的にNDOFモードを使って下さい
+	 * 会場の磁場環境がひどい場合はIMUモードを使ってください
+	 *　ロボットの電源を起動した直後にキャリブレーションを行ってください
+	 */
 	imu.reset();
 	imu.change_fusion_mode(MODE_NDOF);
+
 	wait_ms(100);
 	imu.get_Euler_Angles(&euler_angles);
 	int init_degree = euler_angles.h;
-	imu.reset();
 	motor.omniWheels(0, 0, 0);
 
 	/*Variable*/
 	int rotation, move, distance, degree, direction;
 
 	/*timer*/
+
+
+
+
 	timer_PID.start();
 
 	while (1) {
@@ -98,34 +165,40 @@ int main() {
 //***************************************************************//
 		timer_PID.reset();
 		timer_PID.start();
-		PID(tp, ti, td, init_degree, 0, 1);
+		PID(tp, ti, td, init_degree, 0, 1);//PIDの積分値をリセットする
+
 		while (sw_start == 1) {
-			imu.get_Euler_Angles(&euler_angles); //get gyro
-			rotation = PID(tp, ti, td, init_degree, euler_angles.h); //PID calcurate
+			imu.get_Euler_Angles(&euler_angles); //get gyro value
+			rotation = PID(tp, ti, td, init_degree, euler_angles.h); //PID calc
 
 			/*Line control*/
 			direction = get_line_degree();
 			if (direction != 999) {
+				kick = 0;
 				int tmp = direction;
 
 				/*return from line*/
 				while (direction != 999 && sw_start == 1) {
 					imu.get_Euler_Angles(&euler_angles);
-					rotation = PID(tp, ti, td, 0, euler_angles.h);
-					tmp = direction;
+					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
+					tmp = direction;//踏んだラインの方向を保存
 					if (direction == 90) {
-						direction = 240;
+						if(get_uss_range('b') >= 50){
+							direction = 240;
+						}
 					} else if (direction == 270) {
-						direction = 120;
+						if(get_uss_range('b') >= 50){
+							direction = 120;
+						}
 					} else if (direction <= 179) {
 						direction = direction + 180;
 					} else if (direction >= 180) {
 						direction = direction - 180;
 					}
-					motor.omniWheels(direction, 80, rotation);
+					motor.omniWheels(direction, speed, rotation);
 					direction = get_line_degree();
 				}
-				/*stop & wait*/
+				/*ボールが移動するまでその場で待機*/
 				if (tmp >= 180) {
 					tmp = tmp - 360;
 				}
@@ -133,36 +206,64 @@ int main() {
 				while ((degree > (tmp - 80)) && (degree < (tmp + 80))
 						&& sw_start == 1) {
 					imu.get_Euler_Angles(&euler_angles);
-					rotation = PID(tp, ti, td, 0, euler_angles.h);
+					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
 					motor.omniWheels(0, 0, rotation);
 					degree = get_ball_degree();
 				}
 			}
-
-			/*Ball follow control*/
+			////////////////////////////////////
+			/*Ball follow control*////////////
+			///////////////////////////////////
 			else {
 				/*get ball degree and distance*/
 				degree = get_ball_degree();
 				distance = get_ball_distance();
 
 				if (distance >= 240) { //ball is not found
-					motor.omniWheels(0, 0, rotation);
+					/*
+					 * GKモードの場合、ボールがないときゴール前まで戻ってくる
+					 * FWモードの場合、ボールがないときその場で停止する
+					 *
+					 */
+					bool mode = GK;//モード切替
+					switch(mode){
+						case GK:
+						break;
+						case FW:
+							motor.omniWheels(0, 0, rotation);
+						break;
+						default:
+							motor.omniWheels(0, 0, rotation);
+						break;
+					}
 					kick = 0;
 				} else {
 					if (hold_check.read() == 0) {
 						/*ball hold&kick*/
+						motor.omniWheels(0,speed, rotation);
 						kick = 1;
-						motor.omniWheels(0, 80, rotation);
 					} else {
 						/*Speed control*/
+						move = turn(degree, distance);//回り込み方向を計算する
+						motor.omniWheels(move,speed, rotation);
 						kick = 0;
-						move = turn(degree, distance);
-						motor.omniWheels(move, 80, rotation);
 					}
 				}
 			}
 		}
 		timer_PID.stop();
+
+
+
+
+
+
+
+
+
+
+
+
 
 //***************************************************************//
 ////////////////////////Gyro reset mode////////////////////////////
@@ -171,7 +272,7 @@ int main() {
 			imu.reset();
 			wait_ms(100);
 			imu.get_Euler_Angles(&euler_angles);
-			init_degree = (int) euler_angles.h;
+			init_degree = (int)euler_angles.h;
 		}
 		motor.omniWheels(0, 0, 0);
 
@@ -188,30 +289,45 @@ int main() {
 						}
 					}
 					imu.get_Euler_Angles(&euler_angles);
-					pc.printf("\f");
 					pc.printf("Gyro   degree: %d \r\n", (int) euler_angles.h);
 					pc.printf("Ball   degree: %d \r\n", get_ball_degree());
 					pc.printf("Ball distance: %d \r\n", get_ball_distance());
 					pc.printf("Line   sensor: %d \r\n", get_line_degree());
 					pc.printf("Hold   sensor: %d \r\n", hold_check.read());
-					pc.printf("USS      left: %d cm\r\n", uss_left.Read_cm());
-					pc.printf("USS     right: %d cm\r\n", uss_right.Read_cm());
-					pc.printf("USS      back: %d cm\r\n", uss_back.Read_cm());
+					pc.printf("USS      left: %d cm\r\n",get_uss_range('l'));
+					pc.printf("USS     right: %d cm\r\n",get_uss_range('r'));
+					pc.printf("USS      back: %d cm\r\n",get_uss_range('b'));
 					sensor.putc('D'); //request Line data
 					pc.printf("Line    front: %d\r\n", sensor.getc());
 					pc.printf("Line     back: %d\r\n", sensor.getc());
 					pc.printf("Line     left: %d\r\n", sensor.getc());
 					pc.printf("Line    right: %d\r\n", sensor.getc());
-					uss_left.Send();
-					uss_right.Send();
-					uss_back.Send();
-					wait_ms(40);
+					wait_ms(10);
+					pc.printf("\f");
 				}
 			}
 		}
 		/**********************end main function**************************/
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /////////////////////////////////////////////////////////
 /*PID feedback*/
@@ -257,30 +373,39 @@ int PID(double kp, double ki, double kd, int target, int degree, int reset) {
 /*turn control*/
 ////////////////////////////////////
 int turn(int degree, int distance) {
-
+	int going;
 	if (degree >= -45 && degree <= 45) { //ball is found front
-		return (2 * degree);
+		going = 2 * degree;
 	} else if (degree <= -130 && degree >= 130) { //ball is found back
 		if (degree >= 0) {
-			return (degree + 90);
+			going = degree + 90;
 		} else {
-			return (degree - 90);
+			going = degree - 90;
 		}
 	} else {
 		if (distance <= R) {
 			if (degree >= 0) {
-				return (degree + 90); //(180 - 180/PI*asin(kyori / R));
+				going = degree + 90; //(180 - 180/PI*asin(kyori / R));
 			} else {
-				return (degree - 90); //(180 - 180/PI*asin(kyori / R));
+				going = degree - 90; //(180 - 180/PI*asin(kyori / R));
 			}
 		} else {
 			if (degree >= 0) {
-				return (degree + 180 / PI * asin((double) R / (double) distance)); //ball turn
+				going = degree + ((180.0 / PI) * asin((double) R / (double) distance)); //ball turn
 			} else {
-				return (degree - 180 / PI * asin((double) R / (double) distance));
+				going = degree - ((180.0 / PI) * asin((double) R / (double) distance));
 			}
 		}
 	}
+	if(get_uss_range('b') <= 45){
+		if(going > 90){
+			going = 90;
+		}
+		else if(going < -90){
+			going = -90;
+		}
+	}
+	return going;
 }
 
 /////////////////////////////////////
@@ -333,7 +458,9 @@ void sensor_read() {
 	}
 }
 
-/*****************************/
+//////////////////////////////
+/*get ball degree*/
+//////////////////////////////
 int get_ball_degree(int A) {
 	if (A == 1) {
 		if (ball_distance.read() >= (double) 0.95) {
@@ -346,6 +473,9 @@ int get_ball_degree(int A) {
 	}
 }
 
+//////////////////////////////
+/*get ball distance*/
+//////////////////////////////
 int get_ball_distance(int A) {
 	if (A == 1) {
 		return (uint8_t) (ball_distance.read() * 255);
@@ -354,6 +484,9 @@ int get_ball_distance(int A) {
 	}
 }
 
+//////////////////////////////
+/*get line degree*/
+//////////////////////////////
 int get_line_degree() {
 	switch (line_value) {
 	case 'N':
@@ -388,4 +521,54 @@ int get_line_degree() {
 		//break;
 	}
 }
-/*************************************/
+
+//////////////////////////////////////
+/*USS reading*/
+//////////////////////////////////////
+void uss_send_and_read(){
+	static int count = 0;
+	switch(count){
+	case 0:
+		uss_right_range = uss_right.Read_cm();
+		uss_left.Send();
+		count++;
+		break;
+	case 1:
+		uss_left_range = uss_left.Read_cm();
+		uss_back.Send();
+		count++;
+		break;
+	case 2:
+		uss_back_range = uss_back.Read_cm();
+		uss_right.Send();
+		count = 0;
+		break;
+	default:
+		count = 0;
+		break;
+	}
+}
+/////////////////////////////
+/*get uss range cm*/
+////////////////////////////
+int get_uss_range(char c){
+	if(c == 'l' || c == 'L'){
+		return uss_left_range;
+	}
+	else if(c == 'r' || c == 'R'){
+		return uss_right_range;
+	}
+	else if(c == 'b' || c == 'B'){
+			return uss_back_range;
+	}
+	else{
+		return 999;
+	}
+}
+
+//////////////////////////////////////
+/*Battery check voltage*/
+//////////////////////////////////////
+
+
+
