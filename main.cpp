@@ -95,7 +95,7 @@ int PID(double kp, double ki, double kd, int target, int degree, int reset = 0);
 int get_ball_degree(int A = 0); //ボールの角度を-180~180(ボールなし999)で取得する
 int get_ball_distance(int A = 0); //ボールの距離を0~255で取得する
 int get_line_degree(); //反応したラインの方向(角度)を0~315(反応なし999)で取得する
-int turn(int degree, int distance); //回り込みの進行方向を計算する
+int turn(int degree, int distance,int target = 0,int angle = 0); //回り込みの進行方向を計算する
 int get_uss_range(char c); //超音波センサの距離を取得する　引数('l','r','b')を代入するとその方向の値が得られる
 bool check_voltage();//電圧をチェックする
 
@@ -135,7 +135,7 @@ int main() {
 
 	wait_ms(100);
 	imu.get_Euler_Angles(&euler_angles);
-	int init_degree = euler_angles.h;
+	int init_degree = (int)euler_angles.h;
 	motor.omniWheels(0, 0, 0);
 
 	/*Variable*/
@@ -155,7 +155,7 @@ int main() {
 
 		while (sw_start == 1 && check_voltage() == 1) {
 			imu.get_Euler_Angles(&euler_angles); //ジャイロの値をしゅとくする
-			rotation = PID(tp, ti, td, init_degree, euler_angles.h); //PIDを計算する
+			rotation = PID(tp, ti, td, init_degree, (int)euler_angles.h); //PIDを計算する
 			///////////////////////
 			////*ラインの制御*///////
 			////////////////////
@@ -166,7 +166,7 @@ int main() {
 				/*ラインが反応したときコートの中に戻る制御プログラム*/
 				while (direction != 999 && sw_start == 1 && check_voltage() == 1) {
 					imu.get_Euler_Angles(&euler_angles);
-					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
+					rotation = PID(tp, ti, td, init_degree, (int)euler_angles.h);
 					tmp = direction;			//踏んだラインの方向を保存
 					if (direction == 90) {
 						if (get_uss_range('b') >= 50) {
@@ -192,7 +192,7 @@ int main() {
 				degree = get_ball_degree();
 				while ((degree > (tmp - 80)) && (degree < (tmp + 80))) {
 					imu.get_Euler_Angles(&euler_angles);
-					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
+					rotation = PID(tp, ti, td, init_degree, (int)euler_angles.h);
 					motor.omniWheels(0, 0, rotation);
 					degree = get_ball_degree();
 				}
@@ -382,8 +382,19 @@ int PID(double kp, double ki, double kd, int target, int degree, int reset) {
 /////////////////////////////////////
 /*turn control*/
 ////////////////////////////////////
-int turn(int degree, int distance) {
+int turn(int degree, int distance ,int target, int angle) {
 	int going;
+
+	angle = angle - target; //proportional
+	if (angle <= -180) { //convert to -180 ~ 180
+		angle = angle + 360;
+	}
+	if (angle >= 180) {
+		angle = angle - 360;
+	}
+
+
+	degree = degree + angle;//ジャイロの値を加算
 	if (degree >= -45 && degree <= 45) { //ボールがまえにあるとき
 		going = 2 * degree;
 	} else if (degree <= -150 && degree >= 150) { //ボールが真後ろにある時
@@ -393,13 +404,13 @@ int turn(int degree, int distance) {
 			going = degree - 90;
 		}
 	} else {
-		if (distance <= R) {
+		if (distance <= R) {//ボールとの距離が近すぎるとき
 			if (degree >= 0) {
 				going = degree + 90; //(int)(180.0 - ((180.0/PI)*asin((double)distance / (double)R)));
 			} else {
 				going = degree - 90; //(int)(180.0 - ((180.0/PI)*asin((double)distance / (double)R)));
 			}
-		} else {
+		} else {//ボールとの距離が離れているとき
 			if (degree >= 0) {
 				going = degree + (int)((180.0 / PI) * asin((double) R / (double) distance));
 			} else {
@@ -414,7 +425,7 @@ int turn(int degree, int distance) {
 			going = -90;
 		}
 	}
-	return going;
+	return going - angle;
 }
 
 /////////////////////////////////////
@@ -485,7 +496,7 @@ int get_ball_degree(int A) {
 //////////////////////////////
 /*get ball distance*/
 //////////////////////////////
-int get_ball_distance(int A) {
+int get_ball_distance(int A){
 	if (A == 1) {
 		return (uint8_t) (ball_distance.read() * 255);
 	} else {
