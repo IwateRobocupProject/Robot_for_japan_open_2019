@@ -225,7 +225,7 @@ int main() {
 					 * FWモードの場合、ボールがないときその場で停止する
 					 *
 					 */
-					bool mode = GK;//モード切替
+					int mode = GK;//モード切替
 					switch(mode){
 						case GK:
 						break;
