@@ -163,7 +163,7 @@ int main() {
 			if (direction != 999) {
 				int tmp = direction;
 
-				/*ラインが反応したときの制御*/
+				/*ラインが反応したときコートの中に戻る制御プログラム*/
 				while (direction != 999 && sw_start == 1 && check_voltage() == 1) {
 					imu.get_Euler_Angles(&euler_angles);
 					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
@@ -185,7 +185,7 @@ int main() {
 					direction = get_line_degree();
 				}
 
-				/*ボールが移動するまでその場で待機*/
+				/*コートの中に戻った後、ボールが移動するまでその場で待機する*/
 				if (tmp >= 180) {
 					tmp = tmp - 360;
 				}
@@ -255,14 +255,18 @@ int main() {
 					case FW: //FWモード
 						motor.omniWheels(0, 0, rotation); //ボールがないとき停止する
 						break;
+					default:
+						motor.omniWheels(0, 0, rotation); //ボールがないとき停止する
+						break;
 					}
 				}
 				/////////////////
 				/*ボールが見つかった時*/
 				/////////////////
 				else {
-					static int count = 0;//タイマー代わりのカウンター
+
 					/*ホールドセンサーが反応したとき*/
+					static int count = 0;//タイマー代わりのカウンター
 					if (hold_check.read() == 0) {
 						if(count > 30000){//ホールドしてから0.3秒過ぎたとき時
 							kick = 1; //キックする
@@ -276,6 +280,7 @@ int main() {
 						}
 						motor.omniWheels(0, speed, rotation);//前進する
 					}
+
 					/*ホールドセンサーが反応していないとき*/
 					else {
 						move = turn(degree, distance); //回り込み方向を計算する
@@ -379,9 +384,9 @@ int PID(double kp, double ki, double kd, int target, int degree, int reset) {
 ////////////////////////////////////
 int turn(int degree, int distance) {
 	int going;
-	if (degree >= -45 && degree <= 45) { //ball is found front
+	if (degree >= -45 && degree <= 45) { //ボールがまえにあるとき
 		going = 2 * degree;
-	} else if (degree <= -130 && degree >= 130) { //ball is found back
+	} else if (degree <= -150 && degree >= 150) { //ボールが真後ろにある時
 		if (degree >= 0) {
 			going = degree + 90;
 		} else {
@@ -390,21 +395,19 @@ int turn(int degree, int distance) {
 	} else {
 		if (distance <= R) {
 			if (degree >= 0) {
-				going = degree + 90; //(180 - 180/PI*asin(kyori / R));
+				going = degree + 90; //(int)(180.0 - ((180.0/PI)*asin((double)distance / (double)R)));
 			} else {
-				going = degree - 90; //(180 - 180/PI*asin(kyori / R));
+				going = degree - 90; //(int)(180.0 - ((180.0/PI)*asin((double)distance / (double)R)));
 			}
 		} else {
 			if (degree >= 0) {
-				going = degree
-						+ ((180.0 / PI) * asin((double) R / (double) distance)); //ball turn
+				going = degree + (int)((180.0 / PI) * asin((double) R / (double) distance));
 			} else {
-				going = degree
-						- ((180.0 / PI) * asin((double) R / (double) distance));
+				going = degree - (int)((180.0 / PI) * asin((double) R / (double) distance));
 			}
 		}
 	}
-	if (get_uss_range('b') <= 45) {
+	if (get_uss_range('b') <= 45) {//後ろの壁に近いとき
 		if (going > 90) {
 			going = 90;
 		} else if (going < -90) {
