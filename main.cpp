@@ -5,7 +5,7 @@
 
 //constant
 #define GK	1
-#define	FW	0
+#define FW  0
 #define PI	3.1415926
 
 /*調整するときに読んでね*/
@@ -39,11 +39,11 @@
  */
 
 //パラメータ調整項目
-const int R = 127;//ロボット回り込み半径(0~255)
-const int speed = 80;//(0~100)の間で調整
-const double tp = 0.4;//比例ゲイン
-const double ti = 0.05;//積分ゲイン
-const double td = 2.5;//微分ゲイン
+const int R = 127; //ロボット回り込み半径(0~255)
+const int speed = 80; //(0~100)の間で調整
+const double tp = 0.4; //比例ゲイン
+const double ti = 0.05; //積分ゲイン
+const double td = 2.5; //微分ゲイン
 
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
@@ -52,7 +52,7 @@ Serial pc(SERIAL_TX, SERIAL_RX);
 Ping uss_left(PA_6);
 Ping uss_right(PA_7);
 Ping uss_back(PB_6);
-Ticker timer_USS;//割り込み用
+Ticker timer_USS; //割り込み用
 
 //BallSensor&Linesensor
 AnalogIn ball_degree(PA_4);
@@ -84,32 +84,17 @@ DigitalIn sw_reset(PC_12); //gyro sensor reset switch
 //variable
 char line_value;
 int degree_value, distance_value;
-int uss_left_range = 0,uss_right_range = 0,uss_back_range = 0;
+int uss_left_range = 0, uss_right_range = 0, uss_back_range = 0;
 
 //declear prototype (function list)
-void sensor_read();//シリアル割り込みで使う関数
-void uss_send_and_read();//超音波センサ読み込み
-int PID(double kp, double ki, double kd, int target, int degree, int reset = 0);//姿勢制御のPIDで計算する
-int get_ball_degree(int A = 0);//ボールの角度を-180~180(ボールなし999)で取得する
-int get_ball_distance(int A = 0);//ボールの距離を0~255で取得する
-int get_line_degree();//反応したラインの方向(角度)を0~315(反応なし999)で取得する
-int turn(int degree, int distance);//回り込みの進行方向を計算する
-int get_uss_range(char c);//超音波センサの距離を取得する　引数('l','r','b')を代入するとその方向の値が得られる
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+void sensor_read(); //シリアル割り込みで使う関数
+void uss_send_and_read(); //超音波センサ読み込み
+int PID(double kp, double ki, double kd, int target, int degree, int reset = 0); //姿勢制御のPIDで計算する
+int get_ball_degree(int A = 0); //ボールの角度を-180~180(ボールなし999)で取得する
+int get_ball_distance(int A = 0); //ボールの距離を0~255で取得する
+int get_line_degree(); //反応したラインの方向(角度)を0~315(反応なし999)で取得する
+int turn(int degree, int distance); //回り込みの進行方向を計算する
+int get_uss_range(char c); //超音波センサの距離を取得する　引数('l','r','b')を代入するとその方向の値が得られる
 
 /*****************************************************************/
 /**********************main function******************************/
@@ -129,7 +114,7 @@ int main() {
 	uss_right.Set_Speed_of_Sound(32); //(cm/ms)
 	uss_left.Set_Speed_of_Sound(32); //(cm/ms)
 	uss_back.Set_Speed_of_Sound(32); //(cm/ms)
-	timer_USS.attach(&uss_send_and_read,0.04);//0.04秒ごとに超音波を発信する
+	timer_USS.attach(&uss_send_and_read, 0.04); //0.04秒ごとに超音波を発信する
 
 	/*motor pwm frequency set*/
 	motor.setPwmPeriod(0.00052);
@@ -154,40 +139,38 @@ int main() {
 
 	/*timer*/
 
-
-
-
 	timer_PID.start();
 
 	while (1) {
 //***************************************************************//
-////////////////Play mode(you can write this statement)////////////
+////////////////Play mode////////////
 //***************************************************************//
 		timer_PID.reset();
 		timer_PID.start();
-		PID(tp, ti, td, init_degree, 0, 1);//PIDの積分値をリセットする
+		PID(tp, ti, td, init_degree, 0, 1); //PIDの積分値をリセットする
 
 		while (sw_start == 1) {
-			imu.get_Euler_Angles(&euler_angles); //get gyro value
-			rotation = PID(tp, ti, td, init_degree, euler_angles.h); //PID calc
-
-			/*Line control*/
+			imu.get_Euler_Angles(&euler_angles); //ジャイロの値をしゅとくする
+			rotation = PID(tp, ti, td, init_degree, euler_angles.h); //PIDを計算する
+			///////////////////////
+			////*ラインの制御*///////
+			////////////////////
 			direction = get_line_degree();
 			if (direction != 999) {
 				kick = 0;
 				int tmp = direction;
 
-				/*return from line*/
+				/*ラインが反応したときの制御*/
 				while (direction != 999 && sw_start == 1) {
 					imu.get_Euler_Angles(&euler_angles);
 					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
-					tmp = direction;//踏んだラインの方向を保存
+					tmp = direction;			//踏んだラインの方向を保存
 					if (direction == 90) {
-						if(get_uss_range('b') >= 50){
+						if (get_uss_range('b') >= 50) {
 							direction = 240;
 						}
 					} else if (direction == 270) {
-						if(get_uss_range('b') >= 50){
+						if (get_uss_range('b') >= 50) {
 							direction = 120;
 						}
 					} else if (direction <= 179) {
@@ -198,6 +181,7 @@ int main() {
 					motor.omniWheels(direction, speed, rotation);
 					direction = get_line_degree();
 				}
+
 				/*ボールが移動するまでその場で待機*/
 				if (tmp >= 180) {
 					tmp = tmp - 360;
@@ -212,58 +196,83 @@ int main() {
 				}
 			}
 			////////////////////////////////////
-			/*Ball follow control*////////////
+			/*ボールを追いかけるときの制御プログラム*///////
 			///////////////////////////////////
 			else {
-				/*get ball degree and distance*/
+				/*ボールの角度と距離を取得する*/
 				degree = get_ball_degree();
 				distance = get_ball_distance();
 
-				if (distance >= 240) { //ball is not found
+				////////////////////
+				/*ボールが見つからないとき*/
+				////////////////////
+				if (distance >= 240) {
 					/*
-					 * GKモードの場合、ボールがないときゴール前まで戻ってくる
-					 * FWモードの場合、ボールがないときその場で停止する
+					 * GKモードの場合、ゴール前まで戻ってくる
+					 * FWモードの場合、その場で停止する
 					 *
 					 */
 					int mode = GK;//モード切替
-					switch(mode){
-						case GK:
+					switch (mode) {
+
+					case GK:			//GKモード
+						{
+						int uss_l = get_uss_range('l'), uss_r = get_uss_range('r');			//超音波センサの値を取得する
+						static float Vx = 0, Vy = 0;
+
+						Vy = get_uss_range('b') - 45; //y座標を取る
+						if ((uss_l + uss_r) > 150) { //ロボットが他のロボットと干渉していないときx座標を取る
+							Vx = 182 * (float) uss_l / (float) (uss_l + uss_r) - 91;
+						} else {
+							Vx = 0; //x軸上で座標0にいる判定にする
+						}
+
+						if (Vy >= 0) { //ゴールの前にいないとき
+							int direction_of_going = (int) ((float) 180 / PI) * asin((Vy * Vy) / sqrt(Vx * Vx + Vy * Vy)); //進行方向を計算する
+							if (Vx >= 20) { //右側にいるとき
+								direction_of_going = 180 + direction_of_going;
+								motor.omniWheels(direction_of_going, 80,rotation); //左後ろに移動
+							} else if (Vx <= -20) { //左側にいるとき
+								direction_of_going = 180 - direction_of_going;
+								motor.omniWheels(direction_of_going, 80,rotation); //右後ろに移動
+							} else { //真ん中付近にいるとき
+								motor.omniWheels(180, 80, rotation); //後ろへ移動
+							}
+						} else { //ゴールの前にいるとき
+							if (Vx > 30) {
+								motor.omniWheels(-90, 50, rotation); //左へ移動
+							} else if (Vx < -30) {
+								motor.omniWheels(90, 50, rotation); //右へ移動
+							} else {
+								motor.omniWheels(0, 0, rotation); //停止
+							}
+						}
 						break;
-						case FW:
-							motor.omniWheels(0, 0, rotation);
-						break;
-						default:
-							motor.omniWheels(0, 0, rotation);
+						}
+					case FW: //FWモード
+						motor.omniWheels(0, 0, rotation); //ボールがないとき停止する
 						break;
 					}
-					kick = 0;
-				} else {
+					kick = 0; //キックを解除する
+				}
+				/////////////////
+				/*ボールが見つかった時*/
+				/////////////////
+				else {
 					if (hold_check.read() == 0) {
-						/*ball hold&kick*/
-						motor.omniWheels(0,speed, rotation);
-						kick = 1;
+						/*ホールドセンサーが反応したとき*/
+						motor.omniWheels(0, speed, rotation); //前進する
+						kick = 1; //キックする
 					} else {
-						/*Speed control*/
-						move = turn(degree, distance);//回り込み方向を計算する
-						motor.omniWheels(move,speed, rotation);
-						kick = 0;
+						/*ホールドセンサーが反応していないとき*/
+						move = turn(degree, distance); //回り込み方向を計算する
+						motor.omniWheels(move, speed, rotation); //移動する
+						kick = 0; //キックを解除する
 					}
 				}
 			}
 		}
 		timer_PID.stop();
-
-
-
-
-
-
-
-
-
-
-
-
 
 //***************************************************************//
 ////////////////////////Gyro reset mode////////////////////////////
@@ -272,7 +281,7 @@ int main() {
 			imu.reset();
 			wait_ms(100);
 			imu.get_Euler_Angles(&euler_angles);
-			init_degree = (int)euler_angles.h;
+			init_degree = (int) euler_angles.h;
 		}
 		motor.omniWheels(0, 0, 0);
 
@@ -294,9 +303,9 @@ int main() {
 					pc.printf("Ball distance: %d \r\n", get_ball_distance());
 					pc.printf("Line   sensor: %d \r\n", get_line_degree());
 					pc.printf("Hold   sensor: %d \r\n", hold_check.read());
-					pc.printf("USS      left: %d cm\r\n",get_uss_range('l'));
-					pc.printf("USS     right: %d cm\r\n",get_uss_range('r'));
-					pc.printf("USS      back: %d cm\r\n",get_uss_range('b'));
+					pc.printf("USS      left: %d cm\r\n", get_uss_range('l'));
+					pc.printf("USS     right: %d cm\r\n", get_uss_range('r'));
+					pc.printf("USS      back: %d cm\r\n", get_uss_range('b'));
 					sensor.putc('D'); //request Line data
 					pc.printf("Line    front: %d\r\n", sensor.getc());
 					pc.printf("Line     back: %d\r\n", sensor.getc());
@@ -310,24 +319,6 @@ int main() {
 		/**********************end main function**************************/
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 /////////////////////////////////////////////////////////
 /*PID feedback*/
@@ -391,17 +382,18 @@ int turn(int degree, int distance) {
 			}
 		} else {
 			if (degree >= 0) {
-				going = degree + ((180.0 / PI) * asin((double) R / (double) distance)); //ball turn
+				going = degree
+						+ ((180.0 / PI) * asin((double) R / (double) distance)); //ball turn
 			} else {
-				going = degree - ((180.0 / PI) * asin((double) R / (double) distance));
+				going = degree
+						- ((180.0 / PI) * asin((double) R / (double) distance));
 			}
 		}
 	}
-	if(get_uss_range('b') <= 45){
-		if(going > 90){
+	if (get_uss_range('b') <= 45) {
+		if (going > 90) {
 			going = 90;
-		}
-		else if(going < -90){
+		} else if (going < -90) {
 			going = -90;
 		}
 	}
@@ -445,7 +437,7 @@ void sensor_read() {
 				count++;
 			}
 			buffer[i] = sensor.getc();
-			if (buffer[i] == 210) {//Reget
+			if (buffer[i] == 210) { //Reget
 				i = -1;
 			}
 		}
@@ -525,9 +517,9 @@ int get_line_degree() {
 //////////////////////////////////////
 /*USS reading*/
 //////////////////////////////////////
-void uss_send_and_read(){
+void uss_send_and_read() {
 	static int count = 0;
-	switch(count){
+	switch (count) {
 	case 0:
 		uss_right_range = uss_right.Read_cm();
 		uss_left.Send();
@@ -551,17 +543,14 @@ void uss_send_and_read(){
 /////////////////////////////
 /*get uss range cm*/
 ////////////////////////////
-int get_uss_range(char c){
-	if(c == 'l' || c == 'L'){
+int get_uss_range(char c) {
+	if (c == 'l' || c == 'L') {
 		return uss_left_range;
-	}
-	else if(c == 'r' || c == 'R'){
+	} else if (c == 'r' || c == 'R') {
 		return uss_right_range;
-	}
-	else if(c == 'b' || c == 'B'){
-			return uss_back_range;
-	}
-	else{
+	} else if (c == 'b' || c == 'B') {
+		return uss_back_range;
+	} else {
 		return 999;
 	}
 }
@@ -569,6 +558,4 @@ int get_uss_range(char c){
 //////////////////////////////////////
 /*Battery check voltage*/
 //////////////////////////////////////
-
-
 
