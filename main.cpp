@@ -47,6 +47,9 @@ const double td = 2.5; //微分ゲイン
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
 
+//voltage
+AnalogIn voltage(PC_4);
+
 //UltraSonicSensor
 Ping uss_left(PA_6);
 Ping uss_right(PA_7);
@@ -94,6 +97,7 @@ int get_ball_distance(int A = 0); //ボールの距離を0~255で取得する
 int get_line_degree(); //反応したラインの方向(角度)を0~315(反応なし999)で取得する
 int turn(int degree, int distance); //回り込みの進行方向を計算する
 int get_uss_range(char c); //超音波センサの距離を取得する　引数('l','r','b')を代入するとその方向の値が得られる
+bool check_voltage();//電圧をチェックする
 
 /*****************************************************************/
 /**********************main function******************************/
@@ -148,7 +152,7 @@ int main() {
 		timer_PID.start();
 		PID(tp, ti, td, init_degree, 0, 1); //PIDの積分値をリセットする
 
-		while (sw_start == 1) {
+		while (sw_start == 1 && check_voltage() == 1) {
 			imu.get_Euler_Angles(&euler_angles); //ジャイロの値をしゅとくする
 			rotation = PID(tp, ti, td, init_degree, euler_angles.h); //PIDを計算する
 			///////////////////////
@@ -160,7 +164,7 @@ int main() {
 				int tmp = direction;
 
 				/*ラインが反応したときの制御*/
-				while (direction != 999 && sw_start == 1) {
+				while (direction != 999 && sw_start == 1 && check_voltage() == 1) {
 					imu.get_Euler_Angles(&euler_angles);
 					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
 					tmp = direction;			//踏んだラインの方向を保存
@@ -186,8 +190,7 @@ int main() {
 					tmp = tmp - 360;
 				}
 				degree = get_ball_degree();
-				while ((degree > (tmp - 80)) && (degree < (tmp + 80))
-						&& sw_start == 1) {
+				while ((degree > (tmp - 80)) && (degree < (tmp + 80))) {
 					imu.get_Euler_Angles(&euler_angles);
 					rotation = PID(tp, ti, td, init_degree, euler_angles.h);
 					motor.omniWheels(0, 0, rotation);
@@ -310,6 +313,7 @@ int main() {
 					pc.printf("Line     back: %d\r\n", sensor.getc());
 					pc.printf("Line     left: %d\r\n", sensor.getc());
 					pc.printf("Line    right: %d\r\n", sensor.getc());
+					pc.printf("batey voltage: %f\r\n", voltage.read()*9.9);
 					wait_ms(200);
 					pc.printf("\f");
 				}
@@ -557,4 +561,32 @@ int get_uss_range(char c) {
 //////////////////////////////////////
 /*Battery check voltage*/
 //////////////////////////////////////
+
+bool check_voltage(){
+	static int count1 = 0;
+	static int count2 = 0;
+	static bool S = 1;
+	if(count1 > 10000){
+		if(voltage.read()*9.9 < 6.8){//6.8V以下で自動遮断
+			if(count2 > 1000){//強制停止
+				S = 0;
+			}
+			else{
+				count2++;
+			}
+		}
+		else{
+			if(S != 0){//強制停止してない状態の時
+				count2 = 0;
+				S = 1;
+			}
+
+		}
+		count1 = 0;
+	}
+	else{
+		count1++;
+	}
+	return S;
+}
 
