@@ -15,14 +15,14 @@ _p01(p01),_p10(p10),_pwm1(pwm1),_p02(p02),_p20(p20),_pwm2(pwm2),_p03(p03),_p30(p
     _pwm3 = 0;
 }
 
-/*モーター周波数変更初期設定*/
+/*モーターのPWM周波数を変更する*/
 void Motor::setPwmPeriod(float hz){
     _pwm1.period(hz);
     _pwm2.period(hz);
     _pwm3.period(hz);
 }
 
-/*モーター制御*/
+/*モーターを動かす*/
 void Motor::setPower(float a,float b,float c){
     
     a = a / (float)100;
@@ -35,7 +35,7 @@ void Motor::setPower(float a,float b,float c){
         _pwm1 = a;
     } else if(a == 0) { //ブレーキ
         _p01 = 1;
-        _p10 = 1;//0か1だと思う
+        _p10 = 1;
         _pwm1 = 0;
     } else { //負回転
         _p01 = 0;
@@ -73,25 +73,25 @@ void Motor::setPower(float a,float b,float c){
 }
 
 //*********************************************************************************/////////
-///////モーター制御θ(degree)に進行方向,powerにPWMの値(0～100),修正値をmodに代入,右回転基準//////////
+///////3輪オムニホイール制御(進行方向(角度),パワー(スピード),旋回(回転))//////////
 //********************************************************************************://///////
-/*3輪用*/
+/*3輪バージョン*/
 void Motor::omniWheels(int degree,int power,int mod){
     double PI = 3.1415926;
-    float motor[3];//モーター用変数
-    float Max[2];//最大値用変数
+    float motor[3];//繝｢繝ｼ繧ｿ繝ｼ逕ｨ螟画焚
+    float Max[2];//譛�螟ｧ蛟､逕ｨ螟画焚
     
-    if(power == 0){//パワー0のとき
+    if(power == 0){//繝代Ρ繝ｼ0縺ｮ縺ｨ縺�
         
-        motor[0] = mod; //モーター右
-        motor[1] = mod; //モーター後
-        motor[2] = mod; //モーター左
+        motor[0] = mod; //繝｢繝ｼ繧ｿ繝ｼ蜿ｳ
+        motor[1] = mod; //繝｢繝ｼ繧ｿ繝ｼ蠕�
+        motor[2] = mod; //繝｢繝ｼ繧ｿ繝ｼ蟾ｦ
     }
     else{ 
     
-        motor[0] = sin((degree-60)*PI/180) + (float)mod * 0.01; //モーター右
-        motor[1] = sin((degree-180)*PI/180) + (float)mod * 0.01; //モーター後
-        motor[2] = sin((degree-300)*PI/180) + (float)mod * 0.01; //モーター左
+        motor[0] = sin((degree-60)*PI/180) + (float)mod * 0.01; //繝｢繝ｼ繧ｿ繝ｼ蜿ｳ
+        motor[1] = sin((degree-180)*PI/180) + (float)mod * 0.01; //繝｢繝ｼ繧ｿ繝ｼ蠕�
+        motor[2] = sin((degree-300)*PI/180) + (float)mod * 0.01; //繝｢繝ｼ繧ｿ繝ｼ蟾ｦ
         
         if(motor[0]>1){
             motor[0] = 1;
@@ -113,7 +113,7 @@ void Motor::omniWheels(int degree,int power,int mod){
         }
         
     
-        if(fabs(motor[0]) >= fabs(motor[1])){ //モーターパワー最大値計算
+        if(fabs(motor[0]) >= fabs(motor[1])){ //繝｢繝ｼ繧ｿ繝ｼ繝代Ρ繝ｼ譛�螟ｧ蛟､險育ｮ�
             Max[0] = fabs(motor[0]);
         }
         else{
@@ -123,11 +123,11 @@ void Motor::omniWheels(int degree,int power,int mod){
             Max[1] = fabs(motor[2]);
         }
         else{
-            Max[1] = Max[0];//最大値
+            Max[1] = Max[0];//譛�螟ｧ蛟､
         }
         
     
-        motor[0] = (power*(motor[0]/Max[1]));//モータパワー最大値修正
+        motor[0] = (power*(motor[0]/Max[1]));//繝｢繝ｼ繧ｿ繝代Ρ繝ｼ譛�螟ｧ蛟､菫ｮ豁｣
         motor[1] = (power*(motor[1]/Max[1]));
         motor[2] = (power*(motor[2]/Max[1]));
     }

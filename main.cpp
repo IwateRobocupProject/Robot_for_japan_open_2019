@@ -13,7 +13,6 @@
  * 以下の調整は試合前に必ずに行ってください
  *
  * 一つ目はラインセンサの調整です
- *　ロボットを起動し、USBケーブルを挿しこんだ後
  *　ロボットを起動し、USBケーブルを挿しこんだ後ターミナルを起動して'd'を押してください
  *　各種センサ値が表示されます
  *　コートの緑のマット上でLine_front ~ Line_rightの数値が
@@ -215,9 +214,9 @@ int main() {
 					int mode = GK;//モード切替
 					switch (mode) {
 
-					case GK:			//GKモード
+					case GK://GKモード
 						{
-						int uss_l = get_uss_range('l'), uss_r = get_uss_range('r');			//超音波センサの値を取得する
+						int uss_l = get_uss_range('l'), uss_r = get_uss_range('r');//超音波センサの値を取得する
 						static float Vx = 0, Vy = 0;
 
 						Vy = get_uss_range('b') - 45; //y座標を取る
@@ -311,7 +310,7 @@ int main() {
 					pc.printf("Line     back: %d\r\n", sensor.getc());
 					pc.printf("Line     left: %d\r\n", sensor.getc());
 					pc.printf("Line    right: %d\r\n", sensor.getc());
-					wait_ms(10);
+					wait_ms(200);
 					pc.printf("\f");
 				}
 			}
@@ -445,7 +444,7 @@ void sensor_read() {
 		//combine value
 		degree_value = ((uint16_t) buffer[0] << 8) + (uint8_t) buffer[1] - 180;
 		distance_value = buffer[2];
-	} else {        //do nothing
+	} else {//do nothing
 		return;
 	}
 }
