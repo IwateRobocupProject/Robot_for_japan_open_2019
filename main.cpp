@@ -109,6 +109,7 @@ int main() {
 ////////////////////////initialize setting////////////////////////
 //**************************************************************//
 	wait_ms(200);
+	kick = 0;//キックを解除する
 
 	/*Serial Interrupt*/
 	sensor.attach(&sensor_read, Serial::RxIrq);
@@ -160,7 +161,6 @@ int main() {
 			////////////////////
 			direction = get_line_degree();
 			if (direction != 999) {
-				kick = 0;
 				int tmp = direction;
 
 				/*ラインが反応したときの制御*/
@@ -230,7 +230,7 @@ int main() {
 						}
 
 						if (Vy >= 0) { //ゴールの前にいないとき
-							int direction_of_going = (int) ((float) 180 / PI) * asin((Vy * Vy) / sqrt(Vx * Vx + Vy * Vy)); //進行方向を計算する
+							int direction_of_going = (int) ((float) 180 / PI) * (float)asin((Vy * Vy) / sqrt(Vx * Vx + Vy * Vy)); //進行方向を計算する
 							if (Vx >= 20) { //右側にいるとき
 								direction_of_going = 180 + direction_of_going;
 								motor.omniWheels(direction_of_going, 80,rotation); //左後ろに移動
@@ -241,35 +241,46 @@ int main() {
 								motor.omniWheels(180, 80, rotation); //後ろへ移動
 							}
 						} else { //ゴールの前にいるとき
-							if (Vx > 30) {
+							if (Vx > 30) {//右側にいるとき
 								motor.omniWheels(-90, 50, rotation); //左へ移動
-							} else if (Vx < -30) {
+							} else if (Vx < -30) {//左側にいるとき
 								motor.omniWheels(90, 50, rotation); //右へ移動
-							} else {
+							} else {//真ん中にいるとき
 								motor.omniWheels(0, 0, rotation); //停止
 							}
 						}
 						break;
 						}
+
 					case FW: //FWモード
 						motor.omniWheels(0, 0, rotation); //ボールがないとき停止する
 						break;
 					}
-					kick = 0; //キックを解除する
 				}
 				/////////////////
 				/*ボールが見つかった時*/
 				/////////////////
 				else {
+					static int count = 0;//タイマー代わりのカウンター
+					/*ホールドセンサーが反応したとき*/
 					if (hold_check.read() == 0) {
-						/*ホールドセンサーが反応したとき*/
-						motor.omniWheels(0, speed, rotation); //前進する
-						kick = 1; //キックする
-					} else {
-						/*ホールドセンサーが反応していないとき*/
+						if(count > 30000){//ホールドしてから0.3秒過ぎたとき時
+							kick = 1; //キックする
+							wait_ms(100);//キック待機時間
+							kick = 0;//キックを解除する
+							count = 0;//カウンタを0にする
+						}
+						else{
+							wait_us(1);//マイクロ秒
+							count++;
+						}
+						motor.omniWheels(0, speed, rotation);//前進する
+					}
+					/*ホールドセンサーが反応していないとき*/
+					else {
 						move = turn(degree, distance); //回り込み方向を計算する
 						motor.omniWheels(move, speed, rotation); //移動する
-						kick = 0; //キックを解除する
+						count = 0;
 					}
 				}
 			}
