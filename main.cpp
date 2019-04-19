@@ -5,7 +5,7 @@
 
 //constant
 #define GK	1
-#define FW  0
+#define FW	0
 #define PI	3.1415926
 
 /*調整するときに読んでね*/
@@ -230,7 +230,7 @@ int main() {
 						}
 
 						if (Vy >= 0) { //ゴールの前にいないとき
-							int direction_of_going = (int) ((float) 180 / PI) * (float)asin((Vy * Vy) / sqrt(Vx * Vx + Vy * Vy)); //進行方向を計算する
+							int direction_of_going = (int) ((float) 180 / PI) * (float)acos(Vy/ sqrt(Vx * Vx + Vy * Vy)); //進行方向を計算する
 							if (Vx >= 20) { //右側にいるとき
 								direction_of_going = 180 + direction_of_going;
 								motor.omniWheels(direction_of_going, 80,rotation); //左後ろに移動
@@ -535,7 +535,7 @@ int get_line_degree() {
 /*USS reading*/
 //////////////////////////////////////
 void uss_send_and_read() {
-	static int count = 0;
+	static int count = -1;
 	switch (count) {
 	case 0:
 		uss_right_range = uss_right.Read_cm();
@@ -553,6 +553,7 @@ void uss_send_and_read() {
 		count = 0;
 		break;
 	default:
+		uss_right.Send();
 		count = 0;
 		break;
 	}
