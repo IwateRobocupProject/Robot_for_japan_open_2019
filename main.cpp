@@ -440,10 +440,10 @@ void sensor_read() {
 		Reget: //reget point
 		//wait
 		while (sensor.readable() == 0) {
-			if (count >= 1000) {
+			if (count >= 10000) {
 				return;
 			}
-			wait_us(10);
+			wait_us(1);
 			count++;
 		}
 		line_value = sensor.getc();
@@ -458,10 +458,10 @@ void sensor_read() {
 		char buffer[3];
 		for (int i = 0; i < 3; i++) {
 			while (sensor.readable() == 0) { //wait
-				if (count >= 1000) {
+				if (count >= 10000) {
 					return;
 				}
-				wait_us(10);
+				wait_us(1);
 				count++;
 			}
 			buffer[i] = sensor.getc();
@@ -593,7 +593,7 @@ bool check_voltage(){
 	static int count2 = 0;
 	static bool S = 1;
 	if(count1 > 10000){
-		if(voltage.read()*9.9 < 6.8){//6.8V以下で自動遮断
+		if(voltage.read()*9.9 < 6.6){//6.6V以下で自動遮断
 			if(count2 > 1000){//強制停止
 				S = 0;
 			}
