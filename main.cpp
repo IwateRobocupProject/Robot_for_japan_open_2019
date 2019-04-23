@@ -38,11 +38,11 @@
  */
 
 //パラメータ調整項目
-const int R = 127; //ロボット回り込み半径(0~255)
+const int R = 90; //ロボット回り込み半径(0~255)
 const int speed = 80; //(0~100)の間で調整
-const double tp = 0.4; //比例ゲイン
-const double ti = 0.05; //積分ゲイン
-const double td = 2.5; //微分ゲイン
+const double tp = 3; //比例ゲイン
+const double ti = 0.3; //積分ゲイン
+const double td = 6; //微分ゲイン
 
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
@@ -54,15 +54,15 @@ AnalogIn voltage(PC_4);
 Ping uss_left(PA_6);
 Ping uss_right(PA_7);
 Ping uss_back(PB_6);
-Ticker timer_USS; //割り込み用
+Timer timer_USS;
 
 //BallSensor&Linesensor
 AnalogIn ball_degree(PA_4);
 AnalogIn ball_distance(PB_0);
-Serial sensor(PC_10, PC_11);
+Serial sensor(PC_10, PC_11,115200);
 
 //Motor
-Motor motor(PA_12, PA_11, PA_5, PB_2, PB_1, PA_9, PB_15, PB_14, PB_13);
+Motor motor(PB_15,PB_14,PB_13,PB_2,PB_1,PA_9,PA_12, PA_11, PA_5);
 
 //Timer
 Timer timer_PID;
@@ -77,19 +77,14 @@ BNO055_EULER_TypeDef euler_angles;
 DigitalIn hold_check(PC_3);
 
 //kicker
-DigitalOut kick(PA_8);
+DigitalOut kick(D7);
 
 //ToggleSwitch
 DigitalIn sw_start(PD_2); //program start switch
 DigitalIn sw_reset(PC_12); //gyro sensor reset switch
-
-//variable
-char line_value;
-int degree_value, distance_value;
-int uss_left_range = 0, uss_right_range = 0, uss_back_range = 0;
+DigitalIn sw_kick(USER_BUTTON);
 
 //declear prototype (function list)
-void sensor_read(); //シリアル割り込みで使う関数
 void uss_send_and_read(); //超音波センサ読み込み
 int PID(double kp, double ki, double kd, int target, int degree, int reset = 0); //姿勢制御のPIDで計算する
 int get_ball_degree(int A = 0); //ボールの角度を-180~180(ボールなし999)で取得する
@@ -111,14 +106,10 @@ int main() {
 	wait_ms(200);
 	kick = 0;//キックを解除する
 
-	/*Serial Interrupt*/
-	sensor.attach(&sensor_read, Serial::RxIrq);
-
 	/*ultra sonic sensor set speed*/
-	uss_right.Set_Speed_of_Sound(32); //(cm/ms)
-	uss_left.Set_Speed_of_Sound(32); //(cm/ms)
-	uss_back.Set_Speed_of_Sound(32); //(cm/ms)
-	timer_USS.attach(&uss_send_and_read, 0.04); //0.04秒ごとに超音波を発信する
+	uss_right.Set_Speed_of_Sound(34); //(cm/ms)
+	uss_left.Set_Speed_of_Sound(34); //(cm/ms)
+	uss_back.Set_Speed_of_Sound(34); //(cm/ms)
 
 	/*motor pwm frequency set*/
 	motor.setPwmPeriod(0.00052);
@@ -149,9 +140,11 @@ int main() {
 //***************************************************************//
 ////////////////Play mode////////////
 //***************************************************************//
+		timer_USS.reset();
+		timer_USS.start();
 		timer_PID.reset();
 		timer_PID.start();
-		PID(tp, ti, td, init_degree, 0, 1); //PIDの積分値をリセットする
+		PID(tp, ti, td, init_degree, init_degree, 1); //PIDの積分値をリセットする
 
 		while (sw_start == 1 && check_voltage() == 1) {
 			imu.get_Euler_Angles(&euler_angles); //ジャイロの値をしゅとくする
@@ -160,13 +153,15 @@ int main() {
 			////*ラインの制御*///////
 			////////////////////
 			direction = get_line_degree();
-			if (direction != 999) {
+			//if (direction != 999) {
+			if(0){
 				int tmp = direction;
 
 				/*ラインが反応したときコートの中に戻る制御プログラム*/
 				while (direction != 999 && sw_start == 1 && check_voltage() == 1) {
+
 					imu.get_Euler_Angles(&euler_angles);
-					rotation = PID(tp, ti, td, init_degree, (int)euler_angles.h);
+					rotation = PID(tp, ti, td, init_degree, (int)euler_angles.h,0);
 					tmp = direction;			//踏んだラインの方向を保存
 					if (direction == 90) {
 						if (get_uss_range('b') >= 50) {
@@ -190,7 +185,7 @@ int main() {
 					tmp = tmp - 360;
 				}
 				degree = get_ball_degree();
-				while ((degree > (tmp - 80)) && (degree < (tmp + 80))) {
+				while ((degree > (tmp - 80)) && (degree < (tmp + 80)) && sw_start == 1) {
 					imu.get_Euler_Angles(&euler_angles);
 					rotation = PID(tp, ti, td, init_degree, (int)euler_angles.h);
 					motor.omniWheels(0, 0, rotation);
@@ -214,7 +209,7 @@ int main() {
 					 * FWモードの場合、その場で停止する
 					 *
 					 */
-					int mode = GK;//モード切替
+					int mode = FW;//モード切替
 					switch (mode) {
 
 					case GK://GKモード
@@ -267,8 +262,9 @@ int main() {
 
 					/*ホールドセンサーが反応したとき*/
 					static int count = 0;//タイマー代わりのカウンター
-					if (hold_check.read() == 0) {
-						if(count > 30000){//ホールドしてから0.3秒過ぎたとき時
+					move = turn(degree, distance,init_degree,(int)euler_angles.h); //回り込み方向を計算する
+					/*if (hold_check.read() == 0) {//0
+						if(count > 100){//ホールドしてから0.1秒過ぎたとき時
 							kick = 1; //キックする
 							wait_ms(100);//キック待機時間
 							kick = 0;//キックを解除する
@@ -278,15 +274,11 @@ int main() {
 							wait_us(1);//マイクロ秒
 							count++;
 						}
-						motor.omniWheels(0, speed, rotation);//前進する
 					}
-
-					/*ホールドセンサーが反応していないとき*/
-					else {
-						move = turn(degree, distance); //回り込み方向を計算する
-						motor.omniWheels(move, speed, rotation); //移動する
+					else{
 						count = 0;
-					}
+					}*/
+					motor.omniWheels(move, speed, rotation);
 				}
 			}
 		}
@@ -325,15 +317,31 @@ int main() {
 					pc.printf("USS     right: %d cm\r\n", get_uss_range('r'));
 					pc.printf("USS      back: %d cm\r\n", get_uss_range('b'));
 					sensor.putc('D'); //request Line data
-					pc.printf("Line    front: %d\r\n", sensor.getc());
-					pc.printf("Line     back: %d\r\n", sensor.getc());
-					pc.printf("Line     left: %d\r\n", sensor.getc());
-					pc.printf("Line    right: %d\r\n", sensor.getc());
-					pc.printf("batey voltage: %f\r\n", voltage.read()*9.9);
-					wait_ms(200);
+					while (sensor.readable() == 0);
+					int f = sensor.getc();
+					while (sensor.readable() == 0);
+					int b = sensor.getc();
+					while (sensor.readable() == 0);
+					int l = sensor.getc();
+					while (sensor.readable() == 0);
+					int r = sensor.getc();
+					pc.printf("Line    front: %d\r\n", f);
+					pc.printf("Line     back: %d\r\n", b);
+					pc.printf("Line     left: %d\r\n", l);
+					pc.printf("Line    right: %d\r\n", r);
+					pc.printf("batey voltage: %f\r\n", voltage.read()*8.18);
 					pc.printf("\f");
+					wait_ms(300);
 				}
 			}
+		}
+//****************************************************************//
+//////////////////////kick mode/////////////////////////////////////
+//****************************************************************//
+		if(sw_kick.read() != 1){
+			kick = 1;
+			wait_ms(200);
+			kick = 0;
 		}
 		/**********************end main function**************************/
 	}
@@ -353,7 +361,7 @@ int PID(double kp, double ki, double kd, int target, int degree, int reset) {
 	}
 
 	time = timer_PID.read();
-	dt = pretime - time; //time
+	dt = time - pretime; //time
 	P = degree - target; //proportional
 	if (P <= -180) { //convert to -180 ~ 180
 		P = P + 360;
@@ -428,68 +436,37 @@ int turn(int degree, int distance ,int target, int angle) {
 	return going - angle;
 }
 
-/////////////////////////////////////
-/****get_sensor_value_for_UART******/
-////////////////////////////////////
-void sensor_read() {
-	char command = sensor.getc(); //get value
-	int count = 0;
-
-	/*get line value*/
-	if (command == 200) {
-		Reget: //reget point
-		//wait
-		while (sensor.readable() == 0) {
-			if (count >= 10000) {
-				return;
-			}
-			wait_us(1);
-			count++;
-		}
-		line_value = sensor.getc();
-		//reget
-		if (line_value == 200) {
-			goto Reget;
-		}
-	}
-
-	/*get ball value*/
-	else if (command == 210) {
-		char buffer[3];
-		for (int i = 0; i < 3; i++) {
-			while (sensor.readable() == 0) { //wait
-				if (count >= 10000) {
-					return;
-				}
-				wait_us(1);
-				count++;
-			}
-			buffer[i] = sensor.getc();
-			if (buffer[i] == 210) { //Reget
-				i = -1;
-			}
-		}
-
-		//combine value
-		degree_value = ((uint16_t) buffer[0] << 8) + (uint8_t) buffer[1] - 180;
-		distance_value = buffer[2];
-	} else {//do nothing
-		return;
-	}
-}
-
 //////////////////////////////
 /*get ball degree*/
 //////////////////////////////
 int get_ball_degree(int A) {
-	if (A == 1) {
+	static int value = 0;
+
+	if (A == 1) {//analog read
 		if (ball_distance.read() >= (double) 0.95) {
 			return 999;
 		} else {
 			return (int) (ball_degree.read() * 360 - 185);
 		}
-	} else {
-		return (int) degree_value;
+	} else {//serial read
+
+		/*get ball degree*/
+		int count = 0;
+		sensor.putc('B');
+		char buffer[2];
+		for (int i = 0; i < 2; i++) {
+			while (sensor.readable() == 0) { //wait
+				if (count >= 10000) {
+					return value;
+				}
+				wait_us(1);
+				count++;
+			}
+			buffer[i] = sensor.getc(); //get
+		}
+		value = ((uint16_t) buffer[0] << 8) + (uint8_t) buffer[1] - 180;
+
+		return value;
 	}
 }
 
@@ -497,10 +474,23 @@ int get_ball_degree(int A) {
 /*get ball distance*/
 //////////////////////////////
 int get_ball_distance(int A){
-	if (A == 1) {
+	static int value = 0;
+	if (A == 1) {//analog read
 		return (uint8_t) (ball_distance.read() * 255);
-	} else {
-		return (uint8_t) distance_value;
+	} else {//serial read
+		int count = 0;
+
+		/*get ball distance*/
+		sensor.putc('C');
+		while (sensor.readable() == 0) { //wait
+			if (count >= 10000) {
+				return value;
+			}
+			wait_us(1);
+			count++;
+		}
+		value = (int)sensor.getc(); //get
+		return value;
 	}
 }
 
@@ -508,35 +498,60 @@ int get_ball_distance(int A){
 /*get line degree*/
 //////////////////////////////
 int get_line_degree() {
-	switch (line_value) {
+	static char value = 0;
+	static int degree = 0;
+	int count = 0;
+
+	/*get line value*/
+	sensor.putc('A');
+	while (sensor.readable() == 0) { //wait
+		if (count >= 10000) {
+			return degree;
+		}
+		wait_us(1);
+		count++;
+	}
+	value = sensor.getc(); //get
+
+	switch (value) {
 	case 'N':
+		degree = 999;
 		return 999;
 		//break;
 	case '0':
+		degree = 0;
 		return 0;
 		//break;
 	case '1':
+		degree = 45;
 		return 45;
 		//break;
 	case '2':
+		degree = 90;
 		return 90;
 		//break;
 	case '3':
+		degree = 135;
 		return 135;
 		//break;
 	case '4':
+		degree = 180;
 		return 180;
 		//break;
 	case '5':
+		degree = 225;
 		return 225;
 		//break;
 	case '6':
+		degree = 270;
 		return 270;
 		//break;
 	case '7':
+		degree = 315;
 		return 315;
 		//break;
 	default:
+		degree = 999;
 		return 999;
 		//break;
 	}
@@ -545,9 +560,34 @@ int get_line_degree() {
 //////////////////////////////////////
 /*USS reading*/
 //////////////////////////////////////
-void uss_send_and_read() {
-	static int count = -1;
-	switch (count) {
+/////////////////////////////
+/*get uss range cm*/
+////////////////////////////
+int get_uss_range(char c) {
+	static int count = 0;
+	static int l = 0,r = 0,b =0;
+
+	if(timer_USS.read() >= 0.04){
+		l = uss_left.Read_cm();
+		r = uss_right.Read_cm();
+		b = uss_back.Read_cm();
+		uss_left.Send();
+		uss_right.Send();
+		uss_back.Send();
+		timer_USS.reset();
+	}
+
+	if (c == 'l' || c == 'L') {
+		return l;
+	} else if (c == 'r' || c == 'R') {
+		return r;
+	} else if (c == 'b' || c == 'B') {
+		return b;
+	} else {
+		return 999;
+	}
+
+	/*switch (count) {
 	case 0:
 		uss_right_range = uss_right.Read_cm();
 		uss_left.Send();
@@ -567,22 +607,9 @@ void uss_send_and_read() {
 		uss_right.Send();
 		count = 0;
 		break;
-	}
+	}*/
 }
-/////////////////////////////
-/*get uss range cm*/
-////////////////////////////
-int get_uss_range(char c) {
-	if (c == 'l' || c == 'L') {
-		return uss_left_range;
-	} else if (c == 'r' || c == 'R') {
-		return uss_right_range;
-	} else if (c == 'b' || c == 'B') {
-		return uss_back_range;
-	} else {
-		return 999;
-	}
-}
+
 
 //////////////////////////////////////
 /*Battery check voltage*/
@@ -590,22 +617,20 @@ int get_uss_range(char c) {
 
 bool check_voltage(){
 	static int count1 = 0;
-	static int count2 = 0;
+	static float sum[5] = {8,8,8,8,8};
+	static float Ave = 8;
 	static bool S = 1;
-	if(count1 > 10000){
-		if(voltage.read()*9.9 < 6.6){//6.6V以下で自動遮断
-			if(count2 > 1000){//強制停止
-				S = 0;
-			}
-			else{
-				count2++;
-			}
+	if(count1 > 1000000){
+		for(int i = 4;i > 0; i--){
+			sum[i]=sum[i-1];
+		}
+		sum[0] = voltage.read()*8.18;
+		Ave = (sum[0]+sum[1]+sum[2]+sum[3]+sum[4])/5;
+		if(Ave < 6.8){//6.8V以下で自動遮断
+			S = 0;
 		}
 		else{
-			if(S != 0){//強制停止してない状態の時
-				count2 = 0;
-				S = 1;
-			}
+			S = 1;
 
 		}
 		count1 = 0;
