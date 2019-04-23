@@ -120,6 +120,7 @@ int main() {
 	 * 基本的にNDOFモードを使って下さい
 	 * 会場の磁場環境がひどい場合はIMUモードを使ってください
 	 *　ロボットの電源を起動した直後にキャリブレーションを行ってください
+	 *　キャリブレーションをすることでオウンゴールを防ぐことができます。
 	 */
 	imu.reset();
 	imu.change_fusion_mode(MODE_NDOF);
@@ -263,6 +264,7 @@ int main() {
 					/*ホールドセンサーが反応したとき*/
 					static int count = 0;//タイマー代わりのカウンター
 					move = turn(degree, distance,init_degree,(int)euler_angles.h); //回り込み方向を計算する
+					motor.omniWheels(move, speed, rotation);
 					/*if (hold_check.read() == 0) {//0
 						if(count > 100){//ホールドしてから0.1秒過ぎたとき時
 							kick = 1; //キックする
@@ -278,7 +280,7 @@ int main() {
 					else{
 						count = 0;
 					}*/
-					motor.omniWheels(move, speed, rotation);
+
 				}
 			}
 		}
