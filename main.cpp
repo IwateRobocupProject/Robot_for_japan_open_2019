@@ -38,7 +38,7 @@
  */
 
 //パラメータ調整項目
-const int R = 70; //ロボット回り込み半径(0~255
+const int R = 80; //ロボット回り込み半径(0~255
 const int speed = 85; //(0~100)の間で調整
 const double tp = 1.5; //比例ゲイン
 const double ti = 1.5; //積分ゲイン
@@ -442,7 +442,7 @@ int turn(int degree, int distance, int target, int angle) {
 	}
 
 	degree = degree + angle; //ジャイロの値を加算
-	if (degree >= -60 && degree <= 60) { //ボールがまえにあるとき
+	if (degree >= -45 && degree <= 45) { //ボールがまえにあるとき
 		going = 2 * degree;
 	} else if (degree <= -150 && degree >= 150) { //ボールが真後ろにある時
 		if (degree >= 0) {
