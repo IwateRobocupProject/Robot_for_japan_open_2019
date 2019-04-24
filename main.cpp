@@ -38,11 +38,11 @@
  */
 
 //パラメータ調整項目
-const int R = 90; //ロボット回り込み半径(0~255)
-const int speed = 80; //(0~100)の間で調整
-const double tp = 3; //比例ゲイン
-const double ti = 0.3; //積分ゲイン
-const double td = 6; //微分ゲイン
+const int R = 70; //ロボット回り込み半径(0~255
+const int speed = 100; //(0~100)の間で調整
+const double tp = 1.5; //比例ゲイン
+const double ti = 1.5; //積分ゲイン
+const double td = 0.15; //微分ゲイン
 
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
@@ -55,6 +55,7 @@ Ping uss_left(PA_6);
 Ping uss_right(PA_7);
 Ping uss_back(PB_6);
 Timer timer_USS;
+Timer timer_volt;
 
 //BallSensor&Linesensor
 AnalogIn ball_degree(PA_4);
@@ -145,6 +146,8 @@ int main() {
 		timer_USS.start();
 		timer_PID.reset();
 		timer_PID.start();
+		timer_volt.reset();
+		timer_volt.start();
 		PID(tp, ti, td, init_degree, init_degree, 1); //PIDの積分値をリセットする
 
 		while (sw_start == 1 && check_voltage() == 1) {
@@ -154,8 +157,8 @@ int main() {
 			////*ラインの制御*///////
 			////////////////////
 			direction = get_line_degree();
-			//if (direction != 999) {
-			if(0){
+			if (direction != 999) {
+			//if(0){
 				int tmp = direction;
 
 				/*ラインが反応したときコートの中に戻る制御プログラム*/
@@ -197,6 +200,21 @@ int main() {
 			/*ボールを追いかけるときの制御プログラム*///////
 			///////////////////////////////////
 			else {
+				int P =(int)euler_angles.h  - init_degree; //proportional
+				if (P <= -180) { //convert to -180 ~ 180
+					P = P + 360;
+				}
+				if (P >= 180) {
+					P = P - 360;
+				}
+				/*ロボット向き修正*/
+				if(P <= -45){
+					motor.setPower(50, 50, 50);
+				}
+				else if(P >= 45){
+					motor.setPower(-50,-50,-50);
+				}
+				else{
 				/*ボールの角度と距離を取得する*/
 				degree = get_ball_degree();
 				distance = get_ball_distance();
@@ -263,9 +281,9 @@ int main() {
 
 					/*ホールドセンサーが反応したとき*/
 					static int count = 0;//タイマー代わりのカウンター
-					move = turn(degree, distance,init_degree,(int)euler_angles.h); //回り込み方向を計算する
+					move = turn(degree, distance); //回り込み方向を計算する
 					motor.omniWheels(move, speed, rotation);
-					/*if (hold_check.read() == 0) {//0
+					if (hold_check.read() == 0) {//0
 						if(count > 100){//ホールドしてから0.1秒過ぎたとき時
 							kick = 1; //キックする
 							wait_ms(100);//キック待機時間
@@ -279,8 +297,8 @@ int main() {
 					}
 					else{
 						count = 0;
-					}*/
-
+					}
+				}
 				}
 			}
 		}
@@ -289,7 +307,7 @@ int main() {
 //***************************************************************//
 ////////////////////////Gyro reset mode////////////////////////////
 //***************************************************************//
-		if (sw_reset == 1) {
+		if (sw_reset == 0) {
 			imu.reset();
 			wait_ms(100);
 			imu.get_Euler_Angles(&euler_angles);
@@ -310,14 +328,14 @@ int main() {
 						}
 					}
 					imu.get_Euler_Angles(&euler_angles);
-					pc.printf("Gyro   degree: %d \r\n", (int) euler_angles.h);
+					pc.printf("Gyro   degree: %d \r\n\n", (int) euler_angles.h);
 					pc.printf("Ball   degree: %d \r\n", get_ball_degree());
-					pc.printf("Ball distance: %d \r\n", get_ball_distance());
+					pc.printf("Ball distance: %d \r\n\n", get_ball_distance());
 					pc.printf("Line   sensor: %d \r\n", get_line_degree());
-					pc.printf("Hold   sensor: %d \r\n", hold_check.read());
+					pc.printf("Hold   sensor: %d \r\n\n", hold_check.read());
 					pc.printf("USS      left: %d cm\r\n", get_uss_range('l'));
 					pc.printf("USS     right: %d cm\r\n", get_uss_range('r'));
-					pc.printf("USS      back: %d cm\r\n", get_uss_range('b'));
+					pc.printf("USS      back: %d cm\r\n\n", get_uss_range('b'));
 					sensor.putc('D'); //request Line data
 					while (sensor.readable() == 0);
 					int f = sensor.getc();
@@ -330,9 +348,9 @@ int main() {
 					pc.printf("Line    front: %d\r\n", f);
 					pc.printf("Line     back: %d\r\n", b);
 					pc.printf("Line     left: %d\r\n", l);
-					pc.printf("Line    right: %d\r\n", r);
+					pc.printf("Line    right: %d\r\n\n", r);
 					pc.printf("batey voltage: %f\r\n", voltage.read()*8.18);
-					pc.printf("\f");
+					pc.printf("\f\f\f\f");
 					wait_ms(300);
 				}
 			}
@@ -405,7 +423,7 @@ int turn(int degree, int distance ,int target, int angle) {
 
 
 	degree = degree + angle;//ジャイロの値を加算
-	if (degree >= -45 && degree <= 45) { //ボールがまえにあるとき
+	if (degree >= -60 && degree <= 60) { //ボールがまえにあるとき
 		going = 2 * degree;
 	} else if (degree <= -150 && degree >= 150) { //ボールが真後ろにある時
 		if (degree >= 0) {
@@ -618,11 +636,10 @@ int get_uss_range(char c) {
 //////////////////////////////////////
 
 bool check_voltage(){
-	static int count1 = 0;
 	static float sum[5] = {8,8,8,8,8};
 	static float Ave = 8;
 	static bool S = 1;
-	if(count1 > 1000000){
+	if(timer_volt.read() > 0.2){
 		for(int i = 4;i > 0; i--){
 			sum[i]=sum[i-1];
 		}
@@ -635,10 +652,7 @@ bool check_voltage(){
 			S = 1;
 
 		}
-		count1 = 0;
-	}
-	else{
-		count1++;
+		timer_volt.reset();
 	}
 	return S;
 }
