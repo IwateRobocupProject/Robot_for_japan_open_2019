@@ -248,32 +248,21 @@ int main() {
 							}
 
 							if (Vy >= 0) { //ゴールの前にいないとき
-								int direction_of_going =
-										(int) ((float) 180 / PI)
-												* (float) acos(
-														Vy
-																/ sqrt(
-																		Vx * Vx
-																				+ Vy
-																						* Vy)); //進行方向を計算する
+								int direction_of_going = (int)((180.0 / PI)* acos(Vy/ sqrt(Vx * Vx+ Vy* Vy))); //進行方向を計算する
 								if (Vx >= 20) { //右側にいるとき
-									direction_of_going = 180
-											+ direction_of_going;
-									motor.omniWheels(direction_of_going, 80,
-											rotation); //左後ろに移動
+									direction_of_going = 180 + direction_of_going;
+									motor.omniWheels(direction_of_going, speed/2,rotation); //左後ろに移動
 								} else if (Vx <= -20) { //左側にいるとき
-									direction_of_going = 180
-											- direction_of_going;
-									motor.omniWheels(direction_of_going, 80,
-											rotation); //右後ろに移動
+									direction_of_going = 180 - direction_of_going;
+									motor.omniWheels(direction_of_going, speed/2,rotation); //右後ろに移動
 								} else { //真ん中付近にいるとき
-									motor.omniWheels(180, 80, rotation); //後ろへ移動
+									motor.omniWheels(180,speed/2, rotation); //後ろへ移動
 								}
 							} else { //ゴールの前にいるとき
 								if (Vx > 30) { //右側にいるとき
-									motor.omniWheels(-90, 50, rotation); //左へ移動
+									motor.omniWheels(-90,speed/2, rotation); //左へ移動
 								} else if (Vx < -30) { //左側にいるとき
-									motor.omniWheels(90, 50, rotation); //右へ移動
+									motor.omniWheels(90, speed/2, rotation); //右へ移動
 								} else { //真ん中にいるとき
 									motor.omniWheels(0, 0, rotation); //停止
 								}
