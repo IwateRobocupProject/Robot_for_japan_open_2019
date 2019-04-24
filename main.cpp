@@ -109,9 +109,9 @@ int main() {
 	kick = 0; //キックを解除する
 
 	/*ultra sonic sensor set speed*/
-	uss_right.Set_Speed_of_Sound(34); //(cm/ms)
-	uss_left.Set_Speed_of_Sound(34); //(cm/ms)
-	uss_back.Set_Speed_of_Sound(34); //(cm/ms)
+	uss_right.Set_Speed_of_Sound(32); //(cm/ms)
+	uss_left.Set_Speed_of_Sound(32); //(cm/ms)
+	uss_back.Set_Speed_of_Sound(32); //(cm/ms)
 
 	/*motor pwm frequency set*/
 	motor.setPwmPeriod(0.00052);
@@ -213,9 +213,9 @@ int main() {
 				}
 				/*ロボット向き修正*/
 				if (P <= -35) {
-					motor.setPower(80, 80, 80);
+					motor.setPower(70, 70, 70);
 				} else if (P >= 30) {
-					motor.setPower(-80, -80, -80);
+					motor.setPower(-70, -70, -70);
 				} else {
 					/*ボールの角度と距離を取得する*/
 					degree = get_ball_degree();
@@ -642,9 +642,9 @@ bool check_voltage() {
 		for (int i = 4; i > 0; i--) {
 			sum[i] = sum[i - 1];
 		}
-		sum[0] = voltage.read() * 8.18;
+		sum[0] = voltage.read() * 8.1;
 		Ave = (sum[0] + sum[1] + sum[2] + sum[3] + sum[4]) / 5;
-		if (Ave < 6.8) { //6.8V以下で自動遮断
+		if (Ave < 7.0) { //6.8V以下で自動遮断
 			S = 0;
 		} else {
 			S = 1;
