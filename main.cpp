@@ -361,10 +361,10 @@ int main() {
 					int b = sensor.getc();
 					while (sensor.readable() == 0)
 						;
-					int l = sensor.getc();
+					int r = sensor.getc();
 					while (sensor.readable() == 0)
 						;
-					int r = sensor.getc();
+					int l = sensor.getc();
 					pc.printf("Line    front: %d\r\n", f);
 					pc.printf("Line     back: %d\r\n", b);
 					pc.printf("Line     left: %d\r\n", l);
