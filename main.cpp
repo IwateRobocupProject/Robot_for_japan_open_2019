@@ -51,7 +51,8 @@ Serial pc(SERIAL_TX, SERIAL_RX);
 AnalogIn voltage(PC_4);
 
 //UltraSonicSensor
-Ping uss_left(PA_6);
+DigitalIn change(PA_6);
+Ping uss_left(PB_10);
 Ping uss_right(PA_7);
 Ping uss_back(PB_6);
 Timer timer_USS;
@@ -78,7 +79,7 @@ BNO055_EULER_TypeDef euler_angles;
 DigitalIn hold_check(PC_3);
 
 //kicker
-DigitalOut kick(D7);
+DigitalOut kick(PA_8);
 
 //ToggleSwitch
 DigitalIn sw_start(PD_2); //program start switch
@@ -339,6 +340,9 @@ int main() {
 							break;
 						}
 					}
+					pc.printf("////////////////////////////////////////////\r\n");
+					pc.printf("/*******************debug******************/\r\n");
+					pc.printf("////////////////////////////////////////////\r\n\n");
 					imu.get_Euler_Angles(&euler_angles);
 					pc.printf("Gyro   degree: %d \r\n\n", (int) euler_angles.h);
 					pc.printf("Ball   degree: %d \r\n", get_ball_degree());
@@ -366,7 +370,7 @@ int main() {
 					pc.printf("Line     left: %d\r\n", l);
 					pc.printf("Line    right: %d\r\n\n", r);
 					pc.printf("batey voltage: %f\r\n", voltage.read() * 8.18);
-					pc.printf("\f\f\f\f");
+					pc.printf("\f");
 					wait_ms(300);
 				}
 			}
@@ -625,28 +629,6 @@ int get_uss_range(char c) {
 	} else {
 		return 999;
 	}
-
-	/*switch (count) {
-	 case 0:
-	 uss_right_range = uss_right.Read_cm();
-	 uss_left.Send();
-	 count++;
-	 break;
-	 case 1:
-	 uss_left_range = uss_left.Read_cm();
-	 uss_back.Send();
-	 count++;
-	 break;
-	 case 2:
-	 uss_back_range = uss_back.Read_cm();
-	 uss_right.Send();
-	 count = 0;
-	 break;
-	 default:
-	 uss_right.Send();
-	 count = 0;
-	 break;
-	 }*/
 }
 
 //////////////////////////////////////
