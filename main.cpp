@@ -37,24 +37,22 @@
  *　以上のことが完了してからプログラムの作成を開始してください
  */
 
-
-	/*BNO055モードについて
-	 * ジャイロセンサーには様々なモードがありますが
-	 * 基本的にNDOFモードを使って下さい
-	 * 会場の磁場環境がひどい場合はIMUモードを使ってください
-	 *　ロボットの電源を起動した直後にキャリブレーションを行ってください
-	 *　キャリブレーションをすることでオウンゴールを防ぐことができます。
-	 */
-	/*change Mode IMU,COMPASS,M4G,NDOF_FMC_OFF,NDOF*/
+/*BNO055モードについて
+ * ジャイロセンサーには様々なモードがありますが
+ * 基本的にNDOFモードを使って下さい
+ * 会場の磁場環境がひどい場合はIMUモードを使ってください
+ *　ロボットの電源を起動した直後にキャリブレーションを行ってください
+ *　キャリブレーションをすることでオウンゴールを防ぐことができます。
+ */
+/*change Mode IMU,COMPASS,M4G,NDOF_FMC_OFF,NDOF*/
 
 //パラメータ調整項目
 #define MODE MODE_NDOF//ジャイロのモード
-const int R = 80; //ロボット回り込み半径(0~255
-const int speed = 85; //(0~100)の間で調整
+const int R = 100; //ロボット回り込み半径(0~255
+const int speed = 30; //(0~100)の間で調整
 const double tp = 1.5; //比例ゲイン
 const double ti = 1.5; //積分ゲイン
 const double td = 0.15; //微分ゲイン
-
 
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
@@ -98,9 +96,6 @@ DigitalIn sw_start(PD_2); //program start switch
 DigitalIn sw_reset(PC_12); //gyro sensor reset switch
 DigitalIn sw_kick(USER_BUTTON);
 
-//LED
-DigitalOut my_led(LED1);
-
 //declear prototype (function list)
 void uss_send_and_read(); //超音波センサ読み込み
 int PID(double kp, double ki, double kd, int target, int degree, int reset = 0); //姿勢制御のPIDで計算する
@@ -121,9 +116,9 @@ int main() {
 //**************************************************************//
 ////////////////////////initialize setting////////////////////////
 //**************************************************************//
-	wait_ms(200);
+	wait_ms(50);
 	kick = 0; //キックを解除する
-	my_led = 0;//LEDを消す
+
 	/*ultra sonic sensor set speed*/
 	uss_right.Set_Speed_of_Sound(32); //(cm/ms)
 	uss_left.Set_Speed_of_Sound(32); //(cm/ms)
@@ -138,14 +133,13 @@ int main() {
 
 	motor.omniWheels(0, 0, 0);
 
-	/*gyro sensor*/
+	/*gyro sensor */
 	imu.reset();
-	wait_ms(1000);
-	imu.change_fusion_mode(MODE);
 	wait_ms(100);
+	imu.change_fusion_mode(MODE);
+	wait_ms(200);
 	imu.get_Euler_Angles(&euler_angles);
 	int init_degree = (int) euler_angles.h;
-
 
 	while (1) {
 //***************************************************************//
@@ -166,8 +160,8 @@ int main() {
 			////*ラインの制御*///////
 			////////////////////
 			direction = get_line_degree();
-			if (direction != 999) {
-
+			//if (direction != 999) {
+			if(0){
 				int tmp = direction;
 
 				/*ラインが反応したときコートの中に戻る制御プログラム*/
@@ -199,7 +193,7 @@ int main() {
 					tmp = tmp - 360;
 				}
 				degree = get_ball_degree();
-				while ((degree > (tmp - 80)) && (degree < (tmp + 80))
+				while ((degree > (tmp - 45)) && (degree < (tmp + 45))
 						&& sw_start == 1) {
 					imu.get_Euler_Angles(&euler_angles);
 					rotation = PID(tp, ti, td, init_degree,
@@ -221,9 +215,9 @@ int main() {
 				}
 				/*ロボット向き修正*/
 				if (P <= -35) {
-					motor.setPower(70, 70, 70);
-				} else if (P >= 30) {
-					motor.setPower(-70, -70, -70);
+					motor.setPower(60, 60, 60);
+				} else if (P >= 35) {
+					motor.setPower(-60, -60, -60);
 				} else {
 					/*ボールの角度と距離を取得する*/
 					degree = get_ball_degree();
@@ -248,7 +242,7 @@ int main() {
 							static float Vx = 0, Vy = 0;
 
 							Vy = get_uss_range('b') - 45; //y座標を取る
-							if ((uss_l + uss_r) > 150) { //ロボットが他のロボットと干渉していないときx座標を取る
+							if ((uss_l + uss_r) > 120) { //ロボットが他のロボットと干渉していないときx座標を取る
 								Vx = 182 * (float) uss_l
 										/ (float) (uss_l + uss_r) - 91;
 							} else {
@@ -256,21 +250,26 @@ int main() {
 							}
 
 							if (Vy >= 0) { //ゴールの前にいないとき
-								int direction_of_going = (int)((180.0 / PI)* acos(Vy/ sqrt(Vx * Vx+ Vy* Vy))); //進行方向を計算する
+								int direction_of_going = (int) ((180.0 / PI)
+										* acos(Vy / sqrt(Vx * Vx + Vy * Vy))); //進行方向を計算する
 								if (Vx >= 20) { //右側にいるとき
-									direction_of_going = 180 + direction_of_going;
-									motor.omniWheels(direction_of_going, speed/2,rotation); //左後ろに移動
+									direction_of_going = 180
+											+ direction_of_going;
+									motor.omniWheels(direction_of_going,
+											speed / 2, rotation); //左後ろに移動
 								} else if (Vx <= -20) { //左側にいるとき
-									direction_of_going = 180 - direction_of_going;
-									motor.omniWheels(direction_of_going, speed/2,rotation); //右後ろに移動
+									direction_of_going = 180
+											- direction_of_going;
+									motor.omniWheels(direction_of_going,
+											speed / 2, rotation); //右後ろに移動
 								} else { //真ん中付近にいるとき
-									motor.omniWheels(180,speed/2, rotation); //後ろへ移動
+									motor.omniWheels(180, speed / 2, rotation); //後ろへ移動
 								}
 							} else { //ゴールの前にいるとき
 								if (Vx > 30) { //右側にいるとき
-									motor.omniWheels(-90,speed/2, rotation); //左へ移動
+									motor.omniWheels(-90, speed / 2, rotation); //左へ移動
 								} else if (Vx < -30) { //左側にいるとき
-									motor.omniWheels(90, speed/2, rotation); //右へ移動
+									motor.omniWheels(90, speed / 2, rotation); //右へ移動
 								} else { //真ん中にいるとき
 									motor.omniWheels(0, 0, rotation); //停止
 								}
@@ -296,9 +295,9 @@ int main() {
 						move = turn(degree, distance); //回り込み方向を計算する
 						motor.omniWheels(move, speed, rotation);
 						if (hold_check.read() == 0) { //0
-							if (count > 70) { //ホールドしてから0.1秒過ぎたとき時
+							if (count > 100) { //ホールドしてから0.1秒過ぎたとき時
 								kick = 1; //キックする
-								wait_ms(100); //キック待機時間
+								wait_ms(50); //キック待機時間
 								kick = 0; //キックを解除する
 								count = 0; //カウンタを0にする
 							} else {
@@ -318,17 +317,6 @@ int main() {
 ////////////////////////Gyro reset mode////////////////////////////
 //***************************************************************//
 		if (sw_reset == 0) {
-			imu.reset();
-			wait_ms(10);
-			//while(imu.chip_ready() == 0);//imu set
-			imu.change_fusion_mode(CONFIGMODE);
-
-			//キャリブレーションプロファイル書き込み
-			for(int i = 0; i < 22; i++){
-				imu.write_reg0(i + 0x55,config_profile[i]);
-			}
-			imu.change_fusion_mode(MODE);
-			wait_ms(10);
 			imu.get_Euler_Angles(&euler_angles);
 			init_degree = (int) euler_angles.h;
 		}
@@ -340,29 +328,35 @@ int main() {
 		if (pc.readable() > 0) {
 			char command = pc.getc();
 			//if 'c' is pressed,calibration mode will start.
-			if (command == 'c'){
-				imu.reset();
-				wait_ms(100);
-				while(imu.chip_ready() == 0);//imu set
-				while(1){
-					if(pc.readable() > 0){
-						if(pc.getc() == 'r'){
+			if (command == 'c') {
+				while (1) {
+					if (pc.readable() > 0) {
+						if (pc.getc() == 'r') {
 							break;
 						}
 					}
-					imu.change_fusion_mode(MODE);
-					uint8_t status = 0;
+					uint8_t status = 0, temp[3];
 					status = imu.read_calib_status();
-					pc.printf("SYS:%d, GYRO:%d, ACC:%d, MAG:%d \r",(status>>6),(status<<2)>>6,(status<<4)>>6,(status<<6)>>6);
-					wait(100);
+
+					temp[0] = status << 2;
+					temp[1] = status << 4;
+					temp[2] = status << 6;
+					//pc.printf("%d\r\n",status);
+					pc.printf("SYS:%d, GYRO:%d, ACC:%d, MAG:%d \r", status >> 6,
+							temp[0] >> 6, temp[1] >> 6, temp[2] >> 6);
+
 					//キャリブレーションプロファイル読みとり
-					if((status>>6)==3 && (status<<2)>>6 == 3 && (status<<4)>>6 == 3 && (status<<6)>>6 == 3){
-						my_led = 1;//led on
+					if (temp[2] >> 6 == 3 && temp[0] >> 6 == 3 && status >> 6 == 3) {
 						imu.change_fusion_mode(CONFIGMODE);
-						for(int i = 0; i < 22; i++){
+						for (int i = 0; i < 22; i++) {
 							config_profile[i] = imu.read_reg0(i + 0x55);
 						}
+						kick = 1;
+						wait_ms(200);
+						kick = 0;
+						break;
 					}
+					wait_ms(100);
 				}
 				imu.change_fusion_mode(MODE);
 			}
@@ -374,9 +368,12 @@ int main() {
 							break;
 						}
 					}
-					pc.printf("////////////////////////////////////////////\r\n");
-					pc.printf("/*******************debug******************/\r\n");
-					pc.printf("////////////////////////////////////////////\r\n\n");
+					pc.printf(
+							"////////////////////////////////////////////\r\n");
+					pc.printf(
+							"/*******************debug******************/\r\n");
+					pc.printf(
+							"////////////////////////////////////////////\r\n\n");
 					imu.get_Euler_Angles(&euler_angles);
 					pc.printf("Gyro   degree: %d \r\n\n", (int) euler_angles.h);
 					pc.printf("Ball   degree: %d \r\n", get_ball_degree());
@@ -403,16 +400,46 @@ int main() {
 					pc.printf("Line     back: %d\r\n", b);
 					pc.printf("Line     left: %d\r\n", l);
 					pc.printf("Line    right: %d\r\n\n", r);
-					pc.printf("batey voltage: %f\r\n", voltage.read() * 8.18);
+					pc.printf("batey voltage: %f\r\n", voltage.read() * 10.2);//8.15
 					pc.printf("\f");
 					wait_ms(300);
 				}
 			}
 		}
 //****************************************************************//
-//////////////////////kick mode/////////////////////////////////////
+//////////////////////calibration mode/////////////////////////////////////
 //****************************************************************//
 		if (sw_kick.read() != 1) {
+			uint8_t status = 0, temp[3] = { 0, 0, 0 };
+			/*ジャイロキャリブレーション*/
+			while (1) {
+				status = imu.read_calib_status();
+				temp[0] = status << 2;
+				if (temp[0] >> 6 == 3) {
+					kick = 1;
+					wait_ms(200);
+					kick = 0;
+					break;
+				}
+			}
+			/*コンパスキャリブレーション*/
+			/*(IMUモードの時は必要ないのでコメントアウトして)*/
+			while (1) {
+				status = imu.read_calib_status();
+				temp[2] = status << 6;
+				pc.printf("%d\r",temp[2]>>6);
+				if (temp[2]>>6 == 3 && status >>6 == 3) {
+					break;
+				}
+			}
+			/*キャリブレーションプロファイル取得*/
+			imu.change_fusion_mode(CONFIGMODE);
+			wait_ms(100);
+			for (int i = 0; i < 22; i++) {
+				config_profile[i] = imu.read_reg0(i + 0x55);
+			}
+			imu.change_fusion_mode(MODE);
+			wait_ms(200);
 			kick = 1;
 			wait_ms(200);
 			kick = 0;
@@ -676,7 +703,7 @@ bool check_voltage() {
 		for (int i = 4; i > 0; i--) {
 			sum[i] = sum[i - 1];
 		}
-		sum[0] = voltage.read() * 8.1;
+		sum[0] = voltage.read() * 9.9;
 		Ave = (sum[0] + sum[1] + sum[2] + sum[3] + sum[4]) / 5;
 		if (Ave < 7.0) { //7.0V以下で自動遮断
 			S = 0;

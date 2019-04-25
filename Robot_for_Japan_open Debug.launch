@@ -2,7 +2,7 @@
 <launchConfiguration type="fr.ac6.mcu.debug.config.launchConfigurationType">
 <stringAttribute key="DEBBUGER_BOARD_NAME" value="NUCLEO-F446RE"/>
 <stringAttribute key="DEBBUGER_MCU_NAME" value="STM32F446RETx"/>
-<stringAttribute key="fr.ac6.mcu.debug.launch.debuggerTab.STLINK" value="0669FF505150807567153737"/>
+<stringAttribute key="fr.ac6.mcu.debug.launch.debuggerTab.STLINK" value="066BFF535550755187244136"/>
 <stringAttribute key="fr.ac6.mcu.ide.DBG_DEVICE" value="ST-Link"/>
 <stringAttribute key="fr.ac6.mcu.ide.DBG_DEVICE_SHAREABLE_ALLOWED" value="true"/>
 <stringAttribute key="fr.ac6.mcu.ide.DBG_INTERFACE" value="SWD"/>
