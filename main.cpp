@@ -48,8 +48,9 @@
 
 //パラメータ調整項目
 #define MODE MODE_NDOF//ジャイロのモード
+const int mode_robot = GK;//FW:その場で停止 GK:ゴール前までもどる
 const int R = 100; //ロボット回り込み半径(0~255
-const int speed = 30; //(0~100)の間で調整
+const int speed = 85; //(0~100)の間で調整
 const double tp = 1.5; //比例ゲイン
 const double ti = 1.5; //積分ゲイン
 const double td = 0.15; //微分ゲイン
@@ -160,8 +161,7 @@ int main() {
 			////*ラインの制御*///////
 			////////////////////
 			direction = get_line_degree();
-			//if (direction != 999) {
-			if(0){
+			if (direction != 999) {
 				int tmp = direction;
 
 				/*ラインが反応したときコートの中に戻る制御プログラム*/
@@ -232,8 +232,7 @@ int main() {
 						 * FWモードの場合、その場で停止する
 						 *
 						 */
-						int mode = FW; //モード切替
-						switch (mode) {
+						switch (mode_robot) {
 
 						case GK: //GKモード
 						{
@@ -530,7 +529,7 @@ int turn(int degree, int distance, int target, int angle) {
 			}
 		}
 	}
-	if (get_uss_range('b') <= 45) { //後ろの壁に近いとき
+	if (get_uss_range('b') <= 50) { //後ろの壁に近いとき
 		if (going > 90) {
 			going = 90;
 		} else if (going < -90) {
