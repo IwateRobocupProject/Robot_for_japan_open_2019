@@ -117,7 +117,7 @@ bool check_voltage(); //電圧をチェックする
 
 int main() {
 
-	while(imu.chip_ready() == 0);//imu set
+	//while(imu.chip_ready() == 0);//imu set
 //**************************************************************//
 ////////////////////////initialize setting////////////////////////
 //**************************************************************//
@@ -320,7 +320,7 @@ int main() {
 		if (sw_reset == 0) {
 			imu.reset();
 			wait_ms(10);
-			while(imu.chip_ready() == 0);//imu set
+			//while(imu.chip_ready() == 0);//imu set
 			imu.change_fusion_mode(CONFIGMODE);
 
 			//キャリブレーションプロファイル書き込み
