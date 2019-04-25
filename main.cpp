@@ -37,12 +37,24 @@
  *　以上のことが完了してからプログラムの作成を開始してください
  */
 
+
+	/*BNO055モードについて
+	 * ジャイロセンサーには様々なモードがありますが
+	 * 基本的にNDOFモードを使って下さい
+	 * 会場の磁場環境がひどい場合はIMUモードを使ってください
+	 *　ロボットの電源を起動した直後にキャリブレーションを行ってください
+	 *　キャリブレーションをすることでオウンゴールを防ぐことができます。
+	 */
+	/*change Mode IMU,COMPASS,M4G,NDOF_FMC_OFF,NDOF*/
+
 //パラメータ調整項目
+#define MODE MODE_NDOF//ジャイロのモード
 const int R = 80; //ロボット回り込み半径(0~255
 const int speed = 85; //(0~100)の間で調整
 const double tp = 1.5; //比例ゲイン
 const double ti = 1.5; //積分ゲイン
 const double td = 0.15; //微分ゲイン
+
 
 //TerminalDisplay(TeraTerm)
 Serial pc(SERIAL_TX, SERIAL_RX);
@@ -86,6 +98,9 @@ DigitalIn sw_start(PD_2); //program start switch
 DigitalIn sw_reset(PC_12); //gyro sensor reset switch
 DigitalIn sw_kick(USER_BUTTON);
 
+//LED
+DigitalOut my_led(LED1);
+
 //declear prototype (function list)
 void uss_send_and_read(); //超音波センサ読み込み
 int PID(double kp, double ki, double kd, int target, int degree, int reset = 0); //姿勢制御のPIDで計算する
@@ -102,12 +117,13 @@ bool check_voltage(); //電圧をチェックする
 
 int main() {
 
+	while(imu.chip_ready() == 0);//imu set
 //**************************************************************//
 ////////////////////////initialize setting////////////////////////
 //**************************************************************//
 	wait_ms(200);
 	kick = 0; //キックを解除する
-
+	my_led = 0;//LEDを消す
 	/*ultra sonic sensor set speed*/
 	uss_right.Set_Speed_of_Sound(32); //(cm/ms)
 	uss_left.Set_Speed_of_Sound(32); //(cm/ms)
@@ -116,28 +132,20 @@ int main() {
 	/*motor pwm frequency set*/
 	motor.setPwmPeriod(0.00052);
 
-	/*change Mode IMU,COMPASS,M4G,NDOF_FMC_OFF,NDOF*/
-	/*BNO055モードについて
-	 * ジャイロセンサーには様々なモードがありますが
-	 * 基本的にNDOFモードを使って下さい
-	 * 会場の磁場環境がひどい場合はIMUモードを使ってください
-	 *　ロボットの電源を起動した直後にキャリブレーションを行ってください
-	 *　キャリブレーションをすることでオウンゴールを防ぐことができます。
-	 */
-	imu.reset();
-	imu.change_fusion_mode(MODE_NDOF);
+	/*Variable*/
+	int rotation, move, distance, degree, direction;
+	uint8_t config_profile[24];
 
+	motor.omniWheels(0, 0, 0);
+
+	/*gyro sensor*/
+	imu.reset();
+	wait_ms(1000);
+	imu.change_fusion_mode(MODE);
 	wait_ms(100);
 	imu.get_Euler_Angles(&euler_angles);
 	int init_degree = (int) euler_angles.h;
-	motor.omniWheels(0, 0, 0);
 
-	/*Variable*/
-	int rotation, move, distance, degree, direction;
-
-	/*timer*/
-
-	timer_PID.start();
 
 	while (1) {
 //***************************************************************//
@@ -158,8 +166,8 @@ int main() {
 			////*ラインの制御*///////
 			////////////////////
 			direction = get_line_degree();
-			//if (direction != 999) {
-			if (0) {
+			if (direction != 999) {
+
 				int tmp = direction;
 
 				/*ラインが反応したときコートの中に戻る制御プログラム*/
@@ -311,7 +319,16 @@ int main() {
 //***************************************************************//
 		if (sw_reset == 0) {
 			imu.reset();
-			wait_ms(100);
+			wait_ms(10);
+			while(imu.chip_ready() == 0);//imu set
+			imu.change_fusion_mode(CONFIGMODE);
+
+			//キャリブレーションプロファイル書き込み
+			for(int i = 0; i < 22; i++){
+				imu.write_reg0(i + 0x55,config_profile[i]);
+			}
+			imu.change_fusion_mode(MODE);
+			wait_ms(10);
 			imu.get_Euler_Angles(&euler_angles);
 			init_degree = (int) euler_angles.h;
 		}
@@ -321,8 +338,36 @@ int main() {
 //////////////////////////debug mode///////////////////////////////
 //***************************************************************//
 		if (pc.readable() > 0) {
-			if (pc.getc() == 'd') {
-				//if 'd' is pressed,debug mode will start.
+			char command = pc.getc();
+			//if 'c' is pressed,calibration mode will start.
+			if (command == 'c'){
+				imu.reset();
+				wait_ms(100);
+				while(imu.chip_ready() == 0);//imu set
+				while(1){
+					if(pc.readable() > 0){
+						if(pc.getc() == 'r'){
+							break;
+						}
+					}
+					imu.change_fusion_mode(MODE);
+					uint8_t status = 0;
+					status = imu.read_calib_status();
+					pc.printf("SYS:%d, GYRO:%d, ACC:%d, MAG:%d \r",(status>>6),(status<<2)>>6,(status<<4)>>6,(status<<6)>>6);
+					wait(100);
+					//キャリブレーションプロファイル読みとり
+					if((status>>6)==3 && (status<<2)>>6 == 3 && (status<<4)>>6 == 3 && (status<<6)>>6 == 3){
+						my_led = 1;//led on
+						imu.change_fusion_mode(CONFIGMODE);
+						for(int i = 0; i < 22; i++){
+							config_profile[i] = imu.read_reg0(i + 0x55);
+						}
+					}
+				}
+				imu.change_fusion_mode(MODE);
+			}
+			//if 'd' is pressed,debug mode will start.
+			if (command == 'd') {
 				while (1) {
 					if (pc.readable() > 0) {
 						if (pc.getc() == 'r') { //if 'r' is pressed,debug mode will be end.
@@ -633,7 +678,7 @@ bool check_voltage() {
 		}
 		sum[0] = voltage.read() * 8.1;
 		Ave = (sum[0] + sum[1] + sum[2] + sum[3] + sum[4]) / 5;
-		if (Ave < 7.0) { //6.8V以下で自動遮断
+		if (Ave < 7.0) { //7.0V以下で自動遮断
 			S = 0;
 		} else {
 			S = 1;
