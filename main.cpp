@@ -48,7 +48,7 @@
 
 //パラメータ調整項目
 #define MODE MODE_NDOF//ジャイロのモード
-const int mode_robot = GK;//FW:その場で停止 GK:ゴール前までもどる
+const int mode_robot = FW;//FW:その場で停止 GK:ゴール前までもどる
 const int R = 100; //ロボット回り込み半径(0~255
 const int speed = 85; //(0~100)の間で調整
 const double tp = 1.5; //比例ゲイン
@@ -423,7 +423,7 @@ int main() {
 			}
 			/*コンパスキャリブレーション*/
 			/*(IMUモードの時は必要ないのでコメントアウトして)*/
-			while (1) {
+			while (MODE == MODE_NDOF) {
 				status = imu.read_calib_status();
 				temp[2] = status << 6;
 				pc.printf("%d\r",temp[2]>>6);
